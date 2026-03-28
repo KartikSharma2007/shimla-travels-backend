@@ -1,3 +1,14 @@
+htmlContent: `
+  <div style="text-align:center;">
+    <img src="https://shimla-travels.netlify.app/logo.png" 
+         alt="Shimla Travels" 
+         width="120"
+         style="margin-bottom:20px;" />
+  </div>
+
+  <h2>Booking Confirmed ✅</h2>
+  <p>Hello ${name},</p>
+`
 /**
  * emailService.js — Shimla Travels
  * Uses Brevo (formerly Sendinblue) HTTP API.
