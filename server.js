@@ -209,7 +209,7 @@ app.get('/api/v1/test-send-email', async (req, res) => {
   try {
     const resend = new Resend(apiKey);
     const { data, error } = await resend.emails.send({
-      from: process.env.RESEND_FROM || 'Shimla Travels <onboarding@resend.dev>',
+      from: 'Shimla Travels <onboarding@resend.dev>',
       to: [toEmail],
       subject: 'Test Email from Shimla Travels — ' + new Date().toISOString(),
       html: '<h1>Test Email</h1><p>If you see this, emails are working!</p><p>Sent at: ' + new Date().toString() + '</p>',
