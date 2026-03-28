@@ -159,7 +159,13 @@ const createHotelBooking = asyncHandler(async (req, res) => {
     nights, rooms: numRooms,
     guests: { adults, children, total: adults + children },
     specialRequests, pricing, status: 'upcoming',
-  });
+  }); const user = await User.findById(userId);
+
+  sendBookingConfirmationEmail(
+    user.email,
+    user.fullName,
+    booking
+  );
 
   logger.info(`Hotel booking created: ${booking.bookingReference} by ${req.user.email}`);
   res.status(201).json({
@@ -229,6 +235,14 @@ const createPackageBooking = asyncHandler(async (req, res) => {
     guests: { adults, children, total: adults + children },
     specialRequests, pricing, status: 'upcoming',
   });
+  const user = await User.findById(userId);
+
+  sendBookingConfirmationEmail(
+    user.email,
+    user.fullName,
+    booking
+  );
+
 
   logger.info(`Package booking created: ${booking.bookingReference} by ${req.user.email}`);
   res.status(201).json({
