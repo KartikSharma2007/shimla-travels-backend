@@ -168,8 +168,83 @@ const sendBookingConfirmationEmail = async (toEmail, userName, booking) => {
       to: toEmail,
       subject: `✅ Booking Confirmed — ${booking.bookingReference}`,
       textContent: `Hi ${userName},\n\nYour booking ${booking.bookingReference} for ${itemName} is confirmed!\n${isHotel ? `Check-in: ${fmt(booking.checkIn)}\nCheck-out: ${fmt(booking.checkOut)}` : `Travel Date: ${fmt(booking.travelDate)}`}\nTotal Paid: ₹${amount}\n\nView booking: ${bookingUrl}\n\n— Shimla Travels`,
-      htmlContent: `<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>body{font-family:'Segoe UI',Arial,sans-serif;background:#f4f6f9;margin:0;padding:0}.w{max-width:600px;margin:40px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.1)}.h{background:linear-gradient(135deg,#10b981,#059669);padding:32px 40px;text-align:center}.h h1{color:#fff;margin:0;font-size:22px;font-weight:700}.h p{color:rgba(255,255,255,.85);margin:6px 0 0;font-size:14px}.b{padding:36px 40px;color:#2d3748}.b p{font-size:15px;line-height:1.7;margin:0 0 14px}.ref-box{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:14px;margin:20px 0;text-align:center}.ref{font-size:24px;font-weight:800;color:#059669;letter-spacing:1.5px}.tbl{width:100%;border-collapse:collapse;margin:20px 0;font-size:14px}.tbl td{padding:10px 12px;border-bottom:1px solid #e2e8f0}.tbl td:first-child{color:#718096;font-weight:500;width:40%}.tbl td:last-child{color:#1a202c;font-weight:600}.amt td{background:#f7fafc}.cta{text-align:center;margin:28px 0}.btn{display:inline-block;background:linear-gradient(135deg,#10b981,#059669);color:#fff!important;text-decoration:none;padding:13px 32px;border-radius:8px;font-size:15px;font-weight:600}.note{background:#eff6ff;border-left:4px solid #3b82f6;border-radius:4px;padding:12px 16px;font-size:13px;color:#1e40af;margin-top:16px}.f{background:#f7fafc;padding:20px 40px;text-align:center;font-size:12px;color:#718096}</style></head><body><div class="w"><div class="h"><h1>🏔️ Booking Confirmed!</h1><p>Your Shimla Travels adventure is all set</p></div><div class="b"><p>Hi <strong>${userName}</strong>,</p><p>Your booking is <strong>confirmed</strong> and payment received!</p><div class="ref-box"><div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">Booking Reference</div><div class="ref">${booking.bookingReference}</div></div><table class="tbl"><tr><td>${isHotel ? 'Hotel' : 'Package'}</td><td>${itemName}</td></tr><tr><td>${isHotel ? 'Check-in' : 'Travel Date'}</td><td>${isHotel ? fmt(booking.checkIn) : fmt(booking.travelDate)}</td></tr>${isHotel ? `<tr><td>Check-out</td><td>${fmt(booking.checkOut)}</td></tr>` : ''}<tr><td>Guests</td><td>${booking.guests?.adults || 1} Adult(s)${booking.guests?.children ? `, ${booking.guests.children} Child(ren)` : ''}</td></tr><tr class="amt"><td>Total Paid</td><td style="color:#059669;font-size:15px">₹${amount}</td></tr></table><div class="cta"><a href="${bookingUrl}" class="btn">View My Booking</a></div><div class="note">📋 Save your booking ref <strong>${booking.bookingReference}</strong> — needed at check-in.</div></div><div class="f">© ${new Date().getFullYear()} Shimla Travels &nbsp;|&nbsp; shimlaatravels@gmail.com</div></div></body></html>`,
+
+      htmlContent: `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<style>
+body{font-family:'Segoe UI',Arial,sans-serif;background:#f4f6f9;margin:0;padding:0}
+.w{max-width:600px;margin:40px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.1)}
+.h{background:linear-gradient(135deg,#10b981,#059669);padding:32px 40px;text-align:center}
+.h h1{color:#fff;margin:0;font-size:22px;font-weight:700}
+.h p{color:rgba(255,255,255,.85);margin:6px 0 0;font-size:14px}
+.b{padding:36px 40px;color:#2d3748}
+.b p{font-size:15px;line-height:1.7;margin:0 0 14px}
+.ref-box{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:14px;margin:20px 0;text-align:center}
+.ref{font-size:24px;font-weight:800;color:#059669;letter-spacing:1.5px}
+.tbl{width:100%;border-collapse:collapse;margin:20px 0;font-size:14px}
+.tbl td{padding:10px 12px;border-bottom:1px solid #e2e8f0}
+.tbl td:first-child{color:#718096;font-weight:500;width:40%}
+.tbl td:last-child{color:#1a202c;font-weight:600}
+.amt td{background:#f7fafc}
+.cta{text-align:center;margin:28px 0}
+.btn{display:inline-block;background:linear-gradient(135deg,#10b981,#059669);color:#fff!important;text-decoration:none;padding:13px 32px;border-radius:8px;font-size:15px;font-weight:600}
+.note{background:#eff6ff;border-left:4px solid #3b82f6;border-radius:4px;padding:12px 16px;font-size:13px;color:#1e40af;margin-top:16px}
+.f{background:#f7fafc;padding:20px 40px;text-align:center;font-size:12px;color:#718096}
+</style>
+</head>
+
+<body>
+<div class="w">
+
+  <!-- ✅ HEADER WITH LOGO -->
+  <div class="h">
+    <img src="https://shimla-travels.netlify.app/logo.png" 
+         width="80" 
+         style="margin-bottom:10px; border-radius:8px;" />
+
+    <h1>🏔️ Booking Confirmed!</h1>
+    <p>Your Shimla Travels adventure is all set</p>
+  </div>
+
+  <div class="b">
+    <p>Hi <strong>${userName}</strong>,</p>
+    <p>Your booking is <strong>confirmed</strong> and payment received!</p>
+
+    <div class="ref-box">
+      <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">
+        Booking Reference
+      </div>
+      <div class="ref">${booking.bookingReference}</div>
+    </div>
+
+    <table class="tbl">
+      <tr><td>${isHotel ? 'Hotel' : 'Package'}</td><td>${itemName}</td></tr>
+      <tr><td>${isHotel ? 'Check-in' : 'Travel Date'}</td><td>${isHotel ? fmt(booking.checkIn) : fmt(booking.travelDate)}</td></tr>
+      ${isHotel ? `<tr><td>Check-out</td><td>${fmt(booking.checkOut)}</td></tr>` : ''}
+      <tr><td>Guests</td><td>${booking.guests?.adults || 1} Adult(s)${booking.guests?.children ? `, ${booking.guests.children} Child(ren)` : ''}</td></tr>
+      <tr class="amt"><td>Total Paid</td><td style="color:#059669;font-size:15px">₹${amount}</td></tr>
+    </table>
+
+    <div class="cta">
+      <a href="${bookingUrl}" class="btn">View My Booking</a>
+    </div>
+
+    <div class="note">
+      📋 Save your booking ref <strong>${booking.bookingReference}</strong> — needed at check-in.
+    </div>
+  </div>
+
+  <div class="f">
+    © ${new Date().getFullYear()} Shimla Travels &nbsp;|&nbsp; shimlaatravels@gmail.com
+  </div>
+
+</div>
+</body>
+</html>`
     });
+
   } catch (err) {
     console.error(`[EMAIL] BOOKING CONFIRMATION FAILED for ${toEmail}: ${err.message}`);
     logger.error(`[EMAIL] BOOKING CONFIRMATION FAILED for ${toEmail}: ${err.message}`);
