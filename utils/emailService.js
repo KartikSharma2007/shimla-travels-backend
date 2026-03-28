@@ -5,44 +5,79 @@
  * Free tier: 300 emails/day.
  */
 
+const https = require('https');
 const logger = require('./logger');
 
-const nodemailer = require('nodemailer');
+// ─── Send via Brevo API ───────────────────────────────────────────────────────
+const brevoSend = (payload) => {
+  return new Promise((resolve, reject) => {
+    const apiKey = process.env.BREVO_API_KEY;
+    if (!apiKey) {
+      return reject(new Error('BREVO_API_KEY not set in environment variables'));
+    }
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: 'shimlaatravels@gmail.com',
-    pass: process.env.GMAIL_APP_PASSWORD,
-  },
-});
+    const body = JSON.stringify(payload);
 
-const _send = async (label, { to, subject, htmlContent, textContent, replyTo }) => {
-  console.log(`\n[EMAIL] ===== ${label} =====`);
-  console.log(`[EMAIL] TO: ${to}`);
-  console.log(`[EMAIL] SUBJECT: ${subject}`);
-
-  try {
-    const mailOptions = {
-      from: '"Shimla Travels" <shimlaatravels@gmail.com>',
-      to,
-      subject,
-      html: htmlContent,
-      text: textContent,
-      ...(replyTo && { replyTo }),
+    const options = {
+      hostname: 'api.brevo.com',
+      path: '/v3/smtp/email',
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'content-type': 'application/json',
+        'api-key': apiKey,
+      },
     };
 
-    const info = await transporter.sendMail(mailOptions);
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          try { resolve(JSON.parse(data)); } catch { resolve({}); }
+        } else {
+          try {
+            const err = JSON.parse(data);
+            reject(new Error(`Brevo error ${res.statusCode}: ${err.message || data}`));
+          } catch {
+            reject(new Error(`Brevo error ${res.statusCode}: ${data}`));
+          }
+        }
+      });
+    });
 
-    console.log(`[EMAIL] SUCCESS → ${info.response}`);
-    logger.info(`[EMAIL] ${label} sent to ${to}`);
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+};
 
-    return { success: true };
-  } catch (err) {
-    console.error(`[EMAIL] FAILED → ${err.message}`);
-    logger.error(`[EMAIL] ${label} failed: ${err.message}`);
-    throw err;
-  }
+// ─── Core send helper ─────────────────────────────────────────────────────────
+const _send = async (label, { to, subject, htmlContent, textContent, replyTo }) => {
+  const apiKey = process.env.BREVO_API_KEY;
+  const fromEmail = 'shimlaatravels@gmail.com';
+  const fromName = 'Shimla Travels';
+
+  console.log(`\n[EMAIL] ========== ${label} ==========`);
+  console.log(`[EMAIL] TO      : ${to}`);
+  console.log(`[EMAIL] SUBJECT : ${subject}`);
+  console.log(`[EMAIL] FROM    : ${fromName} <${fromEmail}>`);
+  console.log(`[EMAIL] API_KEY : ${apiKey ? `SET (${apiKey.substring(0, 12)}...)` : 'NOT SET'}`);
+
+  const payload = {
+    sender: { name: fromName, email: fromEmail },
+    to: [{ email: to }],
+    subject,
+    htmlContent,
+    textContent,
+  };
+  if (replyTo) payload.replyTo = { email: replyTo };
+
+  const result = await brevoSend(payload);
+
+  console.log(`[EMAIL] SUCCESS [${label}] → messageId: ${result.messageId || 'sent'}`);
+  logger.info(`[EMAIL] ${label} sent to ${to} — ${result.messageId || 'ok'}`);
+  return { success: true, messageId: result.messageId };
 };
 
 
