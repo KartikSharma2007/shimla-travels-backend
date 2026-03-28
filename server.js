@@ -12,11 +12,17 @@ const logger = require('./utils/logger');
 const routes = require('./routes');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
 const { apiLimiter } = require('./middleware/rateLimiter');
+const { runStartupEmailTest } = require('./utils/emailService');
 
 const app = express();
 
 // Connect to database
 connectDB();
+
+// ── Startup email test — runs once when server starts ─────────────────────────
+// Sends a test email to EMAIL_USER. Shows ✅ or ❌ in terminal immediately.
+// If this fails, booking/cancel emails will also fail.
+runStartupEmailTest();
 
 // ── Fix #17 — Daily cron job: auto-complete bookings whose travel dates have passed ──
 // Previously, bookings were only auto-completed when the specific user fetched theirs.
@@ -129,6 +135,70 @@ app.get('/', (req, res) => {
     version: '1.0.0',
     documentation: '/api/health',
   });
+});
+
+
+// ── Email diagnosis endpoint — open in browser to see what is wrong ───────────
+// URL: https://shimla-travels-backend.onrender.com/api/v1/email-diagnosis
+app.get('/api/v1/email-diagnosis', async (req, res) => {
+  const nodemailer = require('nodemailer');
+  const user = process.env.EMAIL_USER;
+  const pass = process.env.EMAIL_PASS;
+
+  const report = {
+    timestamp: new Date().toISOString(),
+    server: 'RENDER (cloud)',
+    emailConfig: {
+      EMAIL_USER: user || 'NOT SET',
+      EMAIL_PASS_SET: !!pass,
+      EMAIL_PASS_LENGTH: pass ? pass.replace(/\s/g, '').length : 0,
+      EMAIL_PASS_VALUE: pass || 'NOT SET',
+      EMAIL_FROM: process.env.EMAIL_FROM || 'not set',
+    },
+    environment: {
+      NODE_ENV: process.env.NODE_ENV || 'not set',
+      CLIENT_URL: process.env.CLIENT_URL || 'not set',
+      CORS_ORIGINS: process.env.CORS_ORIGINS || 'not set',
+    },
+    smtpTest: 'not run',
+    fix: null,
+  };
+
+  if (!user || !pass) {
+    report.smtpTest = 'SKIPPED - missing credentials';
+    report.fix = 'Go to Render Dashboard → Environment tab → add EMAIL_USER and EMAIL_PASS';
+    return res.json(report);
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com', port: 587, secure: false,
+      auth: { user, pass },
+      tls: { rejectUnauthorized: false },
+    });
+    const info = await transporter.sendMail({
+      from: user, to: user,
+      subject: 'Render Diagnosis Test - ' + new Date().toISOString(),
+      text: 'Email works from Render!',
+    });
+    report.smtpTest = 'SUCCESS';
+    report.messageId = info.messageId;
+    report.fix = 'Email is working! If users not getting emails, check their SPAM folder.';
+  } catch (err) {
+    report.smtpTest = 'FAILED';
+    report.error = err.message;
+    report.errorCode = err.code || 'none';
+    if (err.message.includes('535') || err.message.includes('BadCredentials')) {
+      report.fix = 'EMAIL_PASS is wrong or expired. Go to myaccount.google.com/apppasswords, create new App Password, update in Render Environment tab.';
+    } else if (err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND' || err.code === 'ETIMEDOUT' || err.message.includes('connect')) {
+      report.fix = 'RENDER BLOCKS PORT 587. You must switch to Resend.com API (free). Cannot use nodemailer SMTP on Render free tier.';
+      report.renderBlocksSmtp = true;
+    } else {
+      report.fix = 'Unknown error - see error field above';
+    }
+  }
+
+  res.json(report);
 });
 
 app.use(notFound);

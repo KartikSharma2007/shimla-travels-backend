@@ -426,6 +426,14 @@ const changePassword = asyncHandler(async (req, res) => {
   user.password = newPassword;
   await user.save();
   logger.info(`Password changed for user: ${user.email}`);
+
+  console.log('[CHANGE PASSWORD] Password saved. Now sending notification email to:', user.email);
+  sendPasswordChangedEmail(user.email, user.fullName)
+    .catch(err => {
+      console.error('[CHANGE PASSWORD] ❌ Email failed:', err.message);
+      logger.error(`Password-changed email failed for ${user.email}: ${err.message}`);
+    });
+
   res.json({ success: true, message: 'Password changed successfully. Please log in again.' });
 });
 

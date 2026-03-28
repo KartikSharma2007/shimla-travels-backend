@@ -2,7 +2,7 @@ const { Booking, Hotel, Package } = require('../models');
 const logger = require('../utils/logger');
 const { asyncHandler, AppError } = require('../middleware/errorHandler');
 const { User } = require('../models');
-const { sendBookingCancellationEmail } = require('../utils/emailService');
+const { sendBookingCancellationEmail, sendBookingConfirmationEmail } = require('../utils/emailService');
 
 // ── PRICING CONSTANTS (never trust client-sent prices) ───────────────────
 const TAX_RATE_HOTEL = 0.18; // 18% GST on hotels
@@ -287,11 +287,35 @@ const cancelBooking = asyncHandler(async (req, res) => {
 
   logger.info(`Booking cancelled: ${booking.bookingReference} by ${req.user.email}`);
 
-  // Fire-and-forget cancellation email
-  User.findById(req.user._id).select('email fullName').then(u => {
-    if (u) sendBookingCancellationEmail(u.email, u.fullName, booking)
-      .catch(e => logger.error(`Cancel email failed: ${e.message}`));
-  }).catch(() => { });
+  // ── Send cancellation email — AWAITED for full terminal visibility ───────────
+  console.log('\n╔══════════════════════════════════════════════════════════╗');
+  console.log('║  BOOKING CANCELLED — attempting cancellation email...    ║');
+  console.log('╚══════════════════════════════════════════════════════════╝');
+  console.log(`  Booking  : ${booking.bookingReference}`);
+  console.log(`  User ID  : ${req.user._id}`);
+  console.log(`  User email from token: ${req.user.email}`);
+
+  try {
+    const userForEmail = await User.findById(req.user._id).select('email fullName');
+
+    if (!userForEmail) {
+      console.error('  ❌ PROBLEM: User not found in database for ID:', req.user._id);
+    } else {
+      console.log(`  User     : ${userForEmail.fullName} <${userForEmail.email}>`);
+      console.log(`  Sending cancellation email TO: ${userForEmail.email} ...`);
+
+      await sendBookingCancellationEmail(userForEmail.email, userForEmail.fullName, booking);
+
+      console.log(`  ✅ Cancellation email sent successfully to: ${userForEmail.email}`);
+      console.log(`  ✅ Check inbox (and SPAM folder) of: ${userForEmail.email}`);
+    }
+  } catch (err) {
+    console.error(`  ❌ CANCEL EMAIL FAILED: ${err.message}`);
+    console.error(`  ❌ Code: ${err.code || 'none'}`);
+    console.error(`  ❌ Response: ${err.response || 'none'}`);
+    logger.error(`Cancellation email failed for booking ${booking.bookingReference}: ${err.message}`);
+    // Don't throw — booking is already cancelled
+  }
 
   res.json({
     success: true,

@@ -1,5 +1,6 @@
 const logger = require('../utils/logger');
 const { asyncHandler } = require('../middleware/errorHandler');
+const { sendContactFormEmail } = require('../utils/emailService');
 
 /**
  * Support Controller — Shimla Travels
@@ -760,19 +761,46 @@ const getContactInfo = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc   Submit support ticket
+// @desc   Submit support ticket / contact form
 // @route  POST /api/support/ticket
+// Sends the visitor's message to shimlaatravels@gmail.com and an auto-reply to the visitor.
 const submitTicket = asyncHandler(async (req, res) => {
   const { name, email, phone, category, message, bookingReference } = req.body;
 
-  logger.info(`Support ticket submitted by ${email} - Category: ${category}`);
+  if (!name || !email || !message) {
+    return res.status(400).json({
+      success: false,
+      message: 'Name, email and message are required.',
+    });
+  }
+
+  logger.info(`Contact form submission from ${email} — Category: ${category || 'General'}`);
+
+  // Build the full message body, including optional fields
+  const fullMessage = [
+    message,
+    bookingReference ? `\nBooking Reference: ${bookingReference}` : '',
+    category && category !== 'General' ? `\nCategory: ${category}` : '',
+  ].filter(Boolean).join('');
+
+  try {
+    await sendContactFormEmail({
+      name,
+      email,
+      phone: phone || null,
+      message: fullMessage,
+    });
+  } catch (err) {
+    // Log but still return success to visitor — don't expose SMTP errors
+    logger.error(`Contact form email failed for ${email}: ${err.message}`);
+  }
 
   res.json({
     success: true,
-    message: 'Support ticket submitted successfully. We will contact you soon!',
+    message: 'Your message has been sent! We will get back to you within 24 hours.',
     data: {
       ticketId: `TKT-${Date.now().toString(36).toUpperCase()}`,
-      estimatedResponseTime: '4 hours',
+      estimatedResponseTime: '24 hours',
     },
   });
 });

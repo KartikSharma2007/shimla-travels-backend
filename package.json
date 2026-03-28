@@ -35,7 +35,7 @@
     "mongoose": "^8.0.0",
     "morgan": "^1.10.0",
     "node-cron": "^3.0.3",
-    "nodemailer": "^8.0.2",
+    "nodemailer": "^6.9.9",
     "razorpay": "^2.9.2",
     "uuid": "^9.0.1",
     "winston": "^3.11.0",
