@@ -191,6 +191,55 @@ app.get('/api/v1/email-diagnosis', async (req, res) => {
   res.json(report);
 });
 
+
+// ── Test send endpoint — sends email to any address to verify Resend works ────
+// Usage: https://shimla-travels-backend.onrender.com/api/v1/test-send-email?to=anyemail@gmail.com
+app.get('/api/v1/test-send-email', async (req, res) => {
+  const { Resend } = require('resend');
+  const apiKey = process.env.RESEND_API_KEY;
+  const toEmail = req.query.to;
+
+  if (!toEmail) {
+    return res.json({ error: 'Add ?to=youremail@gmail.com to the URL' });
+  }
+  if (!apiKey) {
+    return res.json({ error: 'RESEND_API_KEY not set on Render' });
+  }
+
+  try {
+    const resend = new Resend(apiKey);
+    const { data, error } = await resend.emails.send({
+      from: process.env.RESEND_FROM || 'Shimla Travels <onboarding@resend.dev>',
+      to: [toEmail],
+      subject: 'Test Email from Shimla Travels — ' + new Date().toISOString(),
+      html: '<h1>Test Email</h1><p>If you see this, emails are working!</p><p>Sent at: ' + new Date().toString() + '</p>',
+      text: 'Test email from Shimla Travels. If you see this, emails are working!',
+    });
+
+    if (error) {
+      return res.json({
+        success: false,
+        to: toEmail,
+        error: error,
+        message: 'Resend rejected this email — see error above',
+      });
+    }
+
+    return res.json({
+      success: true,
+      to: toEmail,
+      resendId: data.id,
+      message: 'Email sent! Check inbox AND spam folder of ' + toEmail,
+    });
+  } catch (err) {
+    return res.json({
+      success: false,
+      to: toEmail,
+      error: err.message,
+    });
+  }
+});
+
 app.use(notFound);
 app.use(errorHandler);
 
