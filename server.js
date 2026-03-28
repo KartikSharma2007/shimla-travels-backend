@@ -12,12 +12,10 @@ const logger = require('./utils/logger');
 const routes = require('./routes');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
 const { apiLimiter } = require('./middleware/rateLimiter');
-const { runStartupEmailTest } = require('./utils/emailService');
 
 const app = express();
 
 connectDB();
-runStartupEmailTest();
 
 // Daily cron job
 const setupCronJobs = () => {
