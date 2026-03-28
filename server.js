@@ -240,6 +240,66 @@ app.get('/api/v1/test-send-email', async (req, res) => {
   }
 });
 
+
+// ── Email diagnosis endpoint ──────────────────────────────────────────────────
+app.get('/api/v1/email-diagnosis', async (req, res) => {
+  const apiKey = process.env.BREVO_API_KEY;
+  res.json({
+    timestamp: new Date().toISOString(),
+    emailService: 'Brevo (HTTP API)',
+    BREVO_API_KEY: apiKey ? `SET (${apiKey.substring(0, 12)}...)` : 'NOT SET',
+    SUPPORT_EMAIL: process.env.SUPPORT_EMAIL || 'not set',
+    NODE_ENV: process.env.NODE_ENV,
+    CLIENT_URL: process.env.CLIENT_URL,
+    status: apiKey ? 'Config looks good — try test-send-email endpoint' : 'BREVO_API_KEY missing — add to Render Environment',
+  });
+});
+
+// ── Test send endpoint ────────────────────────────────────────────────────────
+// Usage: /api/v1/test-send-email?to=anyemail@gmail.com
+app.get('/api/v1/test-send-email', async (req, res) => {
+  const https = require('https');
+  const apiKey = process.env.BREVO_API_KEY;
+  const toEmail = req.query.to;
+
+  if (!toEmail) return res.json({ error: 'Add ?to=youremail@gmail.com to the URL' });
+  if (!apiKey) return res.json({ error: 'BREVO_API_KEY not set on Render' });
+
+  const payload = JSON.stringify({
+    sender: { name: 'Shimla Travels', email: 'shimlaatravels@gmail.com' },
+    to: [{ email: toEmail }],
+    subject: 'Test Email from Shimla Travels — ' + new Date().toISOString(),
+    htmlContent: '<h2>✅ Test Email</h2><p>If you see this, Brevo email is working!</p>',
+    textContent: 'Test email from Shimla Travels. Brevo is working!',
+  });
+
+  const options = {
+    hostname: 'api.brevo.com',
+    path: '/v3/smtp/email',
+    method: 'POST',
+    headers: {
+      'accept': 'application/json',
+      'content-type': 'application/json',
+      'api-key': apiKey,
+    },
+  };
+
+  const req2 = https.request(options, (r) => {
+    let data = '';
+    r.on('data', c => data += c);
+    r.on('end', () => {
+      if (r.statusCode >= 200 && r.statusCode < 300) {
+        res.json({ success: true, to: toEmail, message: 'Email sent! Check inbox AND spam of ' + toEmail, response: JSON.parse(data) });
+      } else {
+        res.json({ success: false, to: toEmail, statusCode: r.statusCode, error: JSON.parse(data) });
+      }
+    });
+  });
+  req2.on('error', e => res.json({ success: false, error: e.message }));
+  req2.write(payload);
+  req2.end();
+});
+
 app.use(notFound);
 app.use(errorHandler);
 
