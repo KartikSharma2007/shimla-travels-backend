@@ -80,41 +80,7 @@ const _send = async (label, { to, subject, htmlContent, textContent, replyTo }) 
   return { success: true, messageId: result.messageId };
 };
 
-// ─── Startup test ─────────────────────────────────────────────────────────────
-const runStartupEmailTest = async () => {
-  const apiKey = process.env.BREVO_API_KEY;
 
-  console.log('\n[STARTUP] =====================================================');
-  console.log('[STARTUP] EMAIL SERVICE: Brevo (HTTP API)');
-  console.log(`[STARTUP] BREVO_API_KEY : ${apiKey ? `SET (${apiKey.substring(0, 12)}...)` : '❌ NOT SET'}`);
-  console.log(`[STARTUP] NODE_ENV      : ${process.env.NODE_ENV}`);
-  console.log(`[STARTUP] CLIENT_URL    : ${process.env.CLIENT_URL}`);
-  console.log('[STARTUP] =====================================================');
-
-  if (!apiKey) {
-    console.log('[STARTUP] ❌ BREVO_API_KEY not set — emails will NOT work!');
-    console.log('[STARTUP] Add BREVO_API_KEY to Render Environment tab');
-    console.log('[STARTUP] =====================================================\n');
-    return;
-  }
-
-  try {
-    await brevoSend({
-      sender: { name: 'Shimla Travels', email: 'shimlaatravels@gmail.com' },
-      to: [{ email: 'shimlaatravels@gmail.com' }],
-      subject: `✅ Shimla Travels Server Started — ${new Date().toISOString()}`,
-      textContent: `Server started. Brevo email is working!\nTime: ${new Date().toString()}`,
-    });
-    console.log('[STARTUP] ✅ TEST EMAIL SENT — Brevo is working!');
-    console.log('[STARTUP] ✅ Check shimlaatravels@gmail.com inbox');
-    logger.info('[STARTUP] Brevo email test passed');
-  } catch (err) {
-    console.log(`[STARTUP] ❌ TEST FAILED: ${err.message}`);
-    logger.error(`[STARTUP] Brevo test failed: ${err.message}`);
-  }
-
-  console.log('[STARTUP] =====================================================\n');
-};
 
 // ─── Password Reset ───────────────────────────────────────────────────────────
 const sendPasswordResetEmail = async (toEmail, resetToken, userName = 'User') => {
@@ -292,5 +258,4 @@ module.exports = {
   sendBookingConfirmationEmail,
   sendBookingCancellationEmail,
   sendContactFormEmail,
-  runStartupEmailTest,
 };
