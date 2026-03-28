@@ -138,64 +138,54 @@ app.get('/', (req, res) => {
 });
 
 
-// ── Email diagnosis endpoint — open in browser to see what is wrong ───────────
+// ── Email diagnosis endpoint ──────────────────────────────────────────────────
 // URL: https://shimla-travels-backend.onrender.com/api/v1/email-diagnosis
 app.get('/api/v1/email-diagnosis', async (req, res) => {
-  const nodemailer = require('nodemailer');
-  const user = process.env.EMAIL_USER;
-  const pass = process.env.EMAIL_PASS;
-
+  const apiKey = process.env.RESEND_API_KEY;
   const report = {
     timestamp: new Date().toISOString(),
     server: 'RENDER (cloud)',
-    emailConfig: {
-      EMAIL_USER: user || 'NOT SET',
-      EMAIL_PASS_SET: !!pass,
-      EMAIL_PASS_LENGTH: pass ? pass.replace(/\s/g, '').length : 0,
-      EMAIL_PASS_VALUE: pass || 'NOT SET',
-      EMAIL_FROM: process.env.EMAIL_FROM || 'not set',
-    },
-    environment: {
+    emailService: 'Resend (HTTP API — not SMTP)',
+    config: {
+      RESEND_API_KEY: apiKey ? `SET (${apiKey.substring(0, 10)}...)` : 'NOT SET — add this in Render Environment tab',
+      RESEND_FROM: process.env.RESEND_FROM || 'not set (will use onboarding@resend.dev)',
+      SUPPORT_EMAIL: process.env.SUPPORT_EMAIL || 'not set',
       NODE_ENV: process.env.NODE_ENV || 'not set',
       CLIENT_URL: process.env.CLIENT_URL || 'not set',
-      CORS_ORIGINS: process.env.CORS_ORIGINS || 'not set',
     },
-    smtpTest: 'not run',
+    test: 'not run',
     fix: null,
   };
 
-  if (!user || !pass) {
-    report.smtpTest = 'SKIPPED - missing credentials';
-    report.fix = 'Go to Render Dashboard → Environment tab → add EMAIL_USER and EMAIL_PASS';
+  if (!apiKey) {
+    report.test = 'SKIPPED — RESEND_API_KEY is missing';
+    report.fix = 'Go to resend.com → sign up free → API Keys → create key → add RESEND_API_KEY to Render Environment tab';
     return res.json(report);
   }
 
   try {
-    const transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com', port: 587, secure: false,
-      auth: { user, pass },
-      tls: { rejectUnauthorized: false },
+    const { Resend } = require('resend');
+    const resend = new Resend(apiKey);
+    const to = process.env.SUPPORT_EMAIL || 'shimlaatravels@gmail.com';
+    const { data, error } = await resend.emails.send({
+      from: process.env.RESEND_FROM || 'onboarding@resend.dev',
+      to: [to],
+      subject: 'Render Email Diagnosis Test — ' + new Date().toISOString(),
+      text: 'Resend email is working from Render!',
     });
-    const info = await transporter.sendMail({
-      from: user, to: user,
-      subject: 'Render Diagnosis Test - ' + new Date().toISOString(),
-      text: 'Email works from Render!',
-    });
-    report.smtpTest = 'SUCCESS';
-    report.messageId = info.messageId;
-    report.fix = 'Email is working! If users not getting emails, check their SPAM folder.';
-  } catch (err) {
-    report.smtpTest = 'FAILED';
-    report.error = err.message;
-    report.errorCode = err.code || 'none';
-    if (err.message.includes('535') || err.message.includes('BadCredentials')) {
-      report.fix = 'EMAIL_PASS is wrong or expired. Go to myaccount.google.com/apppasswords, create new App Password, update in Render Environment tab.';
-    } else if (err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND' || err.code === 'ETIMEDOUT' || err.message.includes('connect')) {
-      report.fix = 'RENDER BLOCKS PORT 587. You must switch to Resend.com API (free). Cannot use nodemailer SMTP on Render free tier.';
-      report.renderBlocksSmtp = true;
+    if (error) {
+      report.test = 'FAILED';
+      report.error = JSON.stringify(error);
+      report.fix = 'Resend API key may be invalid. Check it at resend.com dashboard.';
     } else {
-      report.fix = 'Unknown error - see error field above';
+      report.test = 'SUCCESS';
+      report.resendId = data.id;
+      report.fix = 'Everything is working! Emails will be sent to users on booking/cancel.';
     }
+  } catch (err) {
+    report.test = 'EXCEPTION';
+    report.error = err.message;
+    report.fix = 'Check RESEND_API_KEY value in Render Environment tab.';
   }
 
   res.json(report);
