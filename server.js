@@ -16,91 +16,43 @@ const { runStartupEmailTest } = require('./utils/emailService');
 
 const app = express();
 
-// Connect to database
 connectDB();
-
-// ── Startup email test — runs once when server starts ─────────────────────────
-// Sends a test email to EMAIL_USER. Shows ✅ or ❌ in terminal immediately.
-// If this fails, booking/cancel emails will also fail.
 runStartupEmailTest();
 
-// ── Fix #17 — Daily cron job: auto-complete bookings whose travel dates have passed ──
-// Previously, bookings were only auto-completed when the specific user fetched theirs.
-// If a user never logged back in, confirmed bookings stayed "confirmed" forever,
-// making admin stats wrong. This job runs every day at 2:00 AM server time.
+// Daily cron job
 const setupCronJobs = () => {
   try {
     const cron = require('node-cron');
     const { Booking } = require('./models');
-
     cron.schedule('0 2 * * *', async () => {
-      logger.info('Running daily booking auto-complete job...');
       try {
         const now = new Date();
-
-        // Auto-complete hotel bookings where checkout date has passed
-        const hotelResult = await Booking.updateMany(
-          {
-            bookingType: 'hotel',
-            status: { $in: ['upcoming', 'confirmed'] },
-            'payment.status': 'completed',
-            checkOut: { $lt: now },
-          },
+        const h = await Booking.updateMany(
+          { bookingType: 'hotel', status: { $in: ['upcoming', 'confirmed'] }, 'payment.status': 'completed', checkOut: { $lt: now } },
           { $set: { status: 'completed' } }
         );
-
-        // Auto-complete package bookings where travel date has passed
-        const packageResult = await Booking.updateMany(
-          {
-            bookingType: 'package',
-            status: { $in: ['upcoming', 'confirmed'] },
-            'payment.status': 'completed',
-            travelDate: { $lt: now },
-          },
+        const p = await Booking.updateMany(
+          { bookingType: 'package', status: { $in: ['upcoming', 'confirmed'] }, 'payment.status': 'completed', travelDate: { $lt: now } },
           { $set: { status: 'completed' } }
         );
-
-        logger.info(
-          `Booking auto-complete: ${hotelResult.modifiedCount} hotel + ${packageResult.modifiedCount} package bookings completed.`
-        );
-      } catch (err) {
-        logger.error(`Daily booking cron job failed: ${err.message}`);
-      }
+        logger.info(`Auto-complete: ${h.modifiedCount} hotel + ${p.modifiedCount} package bookings completed.`);
+      } catch (err) { logger.error(`Cron job failed: ${err.message}`); }
     });
-
     logger.info('Cron jobs scheduled: booking auto-complete runs daily at 02:00.');
   } catch (err) {
-    // node-cron not installed yet — warn but don't crash the server
-    logger.warn(`Cron jobs not started (node-cron missing?): ${err.message}. Run: npm install node-cron`);
+    logger.warn(`Cron jobs not started: ${err.message}`);
   }
 };
-
 setupCronJobs();
 
-// Security Middleware
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
-    },
-  },
-}));
+// Security
+app.use(helmet({ contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], styleSrc: ["'self'", "'unsafe-inline'"], scriptSrc: ["'self'"], imgSrc: ["'self'", "data:", "https:"] } } }));
 
-// FIX: CORS now reads from env variable, no hardcoded LAN IPs
-const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173')
-  .split(',')
-  .map(o => o.trim());
-
+const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173').split(',').map(o => o.trim());
 app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) callback(null, true);
+    else callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -109,12 +61,8 @@ app.use(cors({
 
 app.use(hpp());
 app.use(compression());
-
-// FIX: body limit reduced from 50mb to 2mb (was DoS vulnerability)
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
-
-// MongoDB Sanitization
 app.use((req, res, next) => {
   if (req.body) req.body = mongoSanitize(req.body);
   if (req.query) req.query = mongoSanitize(req.query);
@@ -124,152 +72,41 @@ app.use((req, res, next) => {
 
 app.use(morgan('combined', { stream: logger.stream }));
 app.use('/api', apiLimiter);
-
-// API Routes
 app.use('/api', routes);
 
+// Root
 app.get('/', (req, res) => {
-  res.json({
-    success: true,
-    message: 'Welcome to Shimla Travels API',
-    version: '1.0.0',
-    documentation: '/api/health',
-  });
+  res.json({ success: true, message: 'Shimla Travels API', version: '1.0.0' });
 });
 
-
-// ── Email diagnosis endpoint ──────────────────────────────────────────────────
-// URL: https://shimla-travels-backend.onrender.com/api/v1/email-diagnosis
-app.get('/api/v1/email-diagnosis', async (req, res) => {
-  const apiKey = process.env.RESEND_API_KEY;
-  const report = {
-    timestamp: new Date().toISOString(),
-    server: 'RENDER (cloud)',
-    emailService: 'Resend (HTTP API — not SMTP)',
-    config: {
-      RESEND_API_KEY: apiKey ? `SET (${apiKey.substring(0, 10)}...)` : 'NOT SET — add this in Render Environment tab',
-      RESEND_FROM: process.env.RESEND_FROM || 'not set (will use onboarding@resend.dev)',
-      SUPPORT_EMAIL: process.env.SUPPORT_EMAIL || 'not set',
-      NODE_ENV: process.env.NODE_ENV || 'not set',
-      CLIENT_URL: process.env.CLIENT_URL || 'not set',
-    },
-    test: 'not run',
-    fix: null,
-  };
-
-  if (!apiKey) {
-    report.test = 'SKIPPED — RESEND_API_KEY is missing';
-    report.fix = 'Go to resend.com → sign up free → API Keys → create key → add RESEND_API_KEY to Render Environment tab';
-    return res.json(report);
-  }
-
-  try {
-    const { Resend } = require('resend');
-    const resend = new Resend(apiKey);
-    const to = process.env.SUPPORT_EMAIL || 'shimlaatravels@gmail.com';
-    const { data, error } = await resend.emails.send({
-      from: process.env.RESEND_FROM || 'onboarding@resend.dev',
-      to: [to],
-      subject: 'Render Email Diagnosis Test — ' + new Date().toISOString(),
-      text: 'Resend email is working from Render!',
-    });
-    if (error) {
-      report.test = 'FAILED';
-      report.error = JSON.stringify(error);
-      report.fix = 'Resend API key may be invalid. Check it at resend.com dashboard.';
-    } else {
-      report.test = 'SUCCESS';
-      report.resendId = data.id;
-      report.fix = 'Everything is working! Emails will be sent to users on booking/cancel.';
-    }
-  } catch (err) {
-    report.test = 'EXCEPTION';
-    report.error = err.message;
-    report.fix = 'Check RESEND_API_KEY value in Render Environment tab.';
-  }
-
-  res.json(report);
-});
-
-
-// ── Test send endpoint — sends email to any address to verify Resend works ────
-// Usage: https://shimla-travels-backend.onrender.com/api/v1/test-send-email?to=anyemail@gmail.com
-app.get('/api/v1/test-send-email', async (req, res) => {
-  const { Resend } = require('resend');
-  const apiKey = process.env.RESEND_API_KEY;
-  const toEmail = req.query.to;
-
-  if (!toEmail) {
-    return res.json({ error: 'Add ?to=youremail@gmail.com to the URL' });
-  }
-  if (!apiKey) {
-    return res.json({ error: 'RESEND_API_KEY not set on Render' });
-  }
-
-  try {
-    const resend = new Resend(apiKey);
-    const { data, error } = await resend.emails.send({
-      from: 'Shimla Travels <onboarding@resend.dev>',
-      to: [toEmail],
-      subject: 'Test Email from Shimla Travels — ' + new Date().toISOString(),
-      html: '<h1>Test Email</h1><p>If you see this, emails are working!</p><p>Sent at: ' + new Date().toString() + '</p>',
-      text: 'Test email from Shimla Travels. If you see this, emails are working!',
-    });
-
-    if (error) {
-      return res.json({
-        success: false,
-        to: toEmail,
-        error: error,
-        message: 'Resend rejected this email — see error above',
-      });
-    }
-
-    return res.json({
-      success: true,
-      to: toEmail,
-      resendId: data.id,
-      message: 'Email sent! Check inbox AND spam folder of ' + toEmail,
-    });
-  } catch (err) {
-    return res.json({
-      success: false,
-      to: toEmail,
-      error: err.message,
-    });
-  }
-});
-
-
-// ── Email diagnosis endpoint ──────────────────────────────────────────────────
+// ── Email diagnosis ───────────────────────────────────────────────────────────
 app.get('/api/v1/email-diagnosis', async (req, res) => {
   const apiKey = process.env.BREVO_API_KEY;
   res.json({
     timestamp: new Date().toISOString(),
-    emailService: 'Brevo (HTTP API)',
-    BREVO_API_KEY: apiKey ? `SET (${apiKey.substring(0, 12)}...)` : 'NOT SET',
+    emailService: 'Brevo (HTTP API — works on Render free tier)',
+    BREVO_API_KEY: apiKey ? `SET (${apiKey.substring(0, 12)}...)` : 'NOT SET — add to Render Environment tab',
     SUPPORT_EMAIL: process.env.SUPPORT_EMAIL || 'not set',
     NODE_ENV: process.env.NODE_ENV,
     CLIENT_URL: process.env.CLIENT_URL,
-    status: apiKey ? 'Config looks good — try test-send-email endpoint' : 'BREVO_API_KEY missing — add to Render Environment',
+    next: 'Open /api/v1/test-send-email?to=youremail@gmail.com to test',
   });
 });
 
-// ── Test send endpoint ────────────────────────────────────────────────────────
-// Usage: /api/v1/test-send-email?to=anyemail@gmail.com
+// ── Test send email ───────────────────────────────────────────────────────────
 app.get('/api/v1/test-send-email', async (req, res) => {
   const https = require('https');
   const apiKey = process.env.BREVO_API_KEY;
   const toEmail = req.query.to;
 
   if (!toEmail) return res.json({ error: 'Add ?to=youremail@gmail.com to the URL' });
-  if (!apiKey) return res.json({ error: 'BREVO_API_KEY not set on Render' });
+  if (!apiKey) return res.json({ error: 'BREVO_API_KEY not set on Render — add it in Environment tab' });
 
   const payload = JSON.stringify({
     sender: { name: 'Shimla Travels', email: 'shimlaatravels@gmail.com' },
     to: [{ email: toEmail }],
     subject: 'Test Email from Shimla Travels — ' + new Date().toISOString(),
-    htmlContent: '<h2>✅ Test Email</h2><p>If you see this, Brevo email is working!</p>',
+    htmlContent: '<h2>Test Email</h2><p>Brevo email is working from Render!</p>',
     textContent: 'Test email from Shimla Travels. Brevo is working!',
   });
 
@@ -289,9 +126,10 @@ app.get('/api/v1/test-send-email', async (req, res) => {
     r.on('data', c => data += c);
     r.on('end', () => {
       if (r.statusCode >= 200 && r.statusCode < 300) {
-        res.json({ success: true, to: toEmail, message: 'Email sent! Check inbox AND spam of ' + toEmail, response: JSON.parse(data) });
+        res.json({ success: true, to: toEmail, message: 'Email sent! Check inbox AND spam folder of ' + toEmail });
       } else {
-        res.json({ success: false, to: toEmail, statusCode: r.statusCode, error: JSON.parse(data) });
+        try { res.json({ success: false, to: toEmail, error: JSON.parse(data) }); }
+        catch { res.json({ success: false, to: toEmail, error: data }); }
       }
     });
   });
