@@ -434,7 +434,12 @@ const changePassword = asyncHandler(async (req, res) => {
       logger.error(`Password-changed email failed for ${user.email}: ${err.message}`);
     });
 
-  res.json({ success: true, message: 'Password changed successfully. Please log in again.' });
+  clearTokenCookie(res);
+
+  res.json({
+    success: true,
+    message: 'Password changed successfully. Please log in again.'
+  });
 });
 
 const updatePreferences = asyncHandler(async (req, res) => {

@@ -161,12 +161,13 @@ const createHotelBooking = asyncHandler(async (req, res) => {
     specialRequests, pricing, status: 'upcoming',
   }); const user = await User.findById(userId);
 
-  sendBookingConfirmationEmail(
-    user.email,
-    user.fullName,
-    booking
-  );
-
+  if (req.user.role === 'user') {
+    await sendBookingConfirmationEmail(
+      user.email,
+      user.fullName,
+      booking
+    );
+  }
   logger.info(`Hotel booking created: ${booking.bookingReference} by ${req.user.email}`);
   res.status(201).json({
     success: true,
@@ -237,11 +238,13 @@ const createPackageBooking = asyncHandler(async (req, res) => {
   });
   const user = await User.findById(userId);
 
-  sendBookingConfirmationEmail(
-    user.email,
-    user.fullName,
-    booking
-  );
+  if (req.user.role === 'user') {
+    await sendBookingConfirmationEmail(
+      user.email,
+      user.fullName,
+      booking
+    );
+  }
 
 
   logger.info(`Package booking created: ${booking.bookingReference} by ${req.user.email}`);
