@@ -130,6 +130,8 @@ const login = asyncHandler(async (req, res) => {
   if (user.loginAttempts > 0) await user.updateOne({ $set: { loginAttempts: 0 }, $unset: { lockUntil: 1 } });
   user.lastLoginAt = new Date();
   user.lastLoginIp = req.ip;
+  user.loginCount = (user.loginCount || 0) + 1;
+  const isFirstLogin = user.loginCount === 1;
   await user.save({ validateBeforeSave: false });
   const token = generateToken(user._id);
   setTokenCookie(res, token);
@@ -138,6 +140,7 @@ const login = asyncHandler(async (req, res) => {
     success: true,
     message: 'Login successful',
     data: {
+      isFirstLogin,   // true only on the very first login
       user: {
         id: user._id,
         fullName: user.fullName,
@@ -153,9 +156,9 @@ const login = asyncHandler(async (req, res) => {
         avatar: user.avatar,
         preferences: user.preferences,
         isEmailVerified: user.isEmailVerified,
-        profileCompleted: user.profileCompleted, // needed by isProfileComplete()
-        authProvider: user.authProvider,     // needed to know if Google/local
-        hasPassword: user.hasPassword,       // needed for Google flow
+        profileCompleted: user.profileCompleted,
+        authProvider: user.authProvider,
+        hasPassword: user.hasPassword,
         createdAt: user.createdAt,
       },
       token,
@@ -226,6 +229,8 @@ const googleLogin = asyncHandler(async (req, res) => {
   if (user && user.authProvider === 'google' && user.hasPassword) {
     user.lastLoginAt = new Date();
     user.lastLoginIp = req.ip;
+    user.loginCount = (user.loginCount || 0) + 1;
+    const isFirstLogin = user.loginCount === 1;
     await user.save({ validateBeforeSave: false });
 
     const token = generateToken(user._id);
@@ -235,6 +240,7 @@ const googleLogin = asyncHandler(async (req, res) => {
       success: true,
       message: 'Google login successful',
       data: {
+        isFirstLogin,   // true only on the very first login
         needsPassword: false,
         user: buildUserPayload(user),
         token,

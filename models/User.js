@@ -175,6 +175,12 @@ const userSchema = new mongoose.Schema({
     default: null,
   },
 
+  // Login history — used to distinguish first-time vs returning users
+  loginCount: {
+    type: Number,
+    default: 0,
+  },
+
   // Preferences
   preferences: {
     newsletter: { type: Boolean, default: true },
