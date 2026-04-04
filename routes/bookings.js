@@ -4,6 +4,7 @@ const { bookingController } = require('../controllers');
 const {
   protect,
   authorize,
+  bookingLimiter,   // ← was paymentLimiter; bookings get their own relaxed limiter
   paymentLimiter,
   createHotelBookingValidator,
   createPackageBookingValidator,
@@ -14,39 +15,26 @@ const {
 /**
  * Booking Routes
  * Base path: /api/bookings
+ *
+ * Rate limiting:
+ *  - bookingLimiter  → creating bookings  (30/hr per user — relaxed)
+ *  - paymentLimiter  → payment endpoints  (30/hr per user)
  */
 
 // All routes require authentication
 router.use(protect);
 
-// Get user's bookings
+// Read operations — no rate limiting (just auth)
 router.get('/', paginationValidator, bookingController.getUserBookings);
-
-// Get booking statistics
 router.get('/stats', bookingController.getBookingStats);
-
-// Create bookings
-router.post(
-  '/hotel',
-  paymentLimiter,
-  createHotelBookingValidator,
-  bookingController.createHotelBooking
-);
-
-router.post(
-  '/package',
-  paymentLimiter,
-  createPackageBookingValidator,
-  bookingController.createPackageBooking
-);
-
-// Get single booking
 router.get('/:id', bookingController.getBooking);
 
-// Cancel booking
-router.put('/:id/cancel', bookingController.cancelBooking);
+// Create bookings — bookingLimiter (separate from payment)
+router.post('/hotel', bookingLimiter, createHotelBookingValidator, bookingController.createHotelBooking);
+router.post('/package', bookingLimiter, createPackageBookingValidator, bookingController.createPackageBooking);
 
-// Update booking (admin only)
+// Mutations
+router.put('/:id/cancel', bookingController.cancelBooking);
 router.put('/:id', authorize('admin'), bookingController.updateBooking);
 
 module.exports = router;
