@@ -127,6 +127,9 @@ const getReviews = asyncHandler(async (req, res) => {
     data: {
       reviews: result.reviews.map(review => ({
         id: review._id,
+        // ✅ FIX: expose userId so the frontend can identify the current user's own review
+        // and always show their live profile picture instead of the stale snapshot
+        userId: review.user ? String(review.user) : null,
         rating: review.rating,
         comment: review.comment,
         title: review.title,
