@@ -412,6 +412,10 @@ const getAllReviews = asyncHandler(async (req, res) => {
 
   const query = {};
   if (flagged) query.isFlagged = true;
+  // ✅ FIX: Support filtering by reviewType ('hotel' or 'package') from admin panel
+  if (req.query.reviewType && ['hotel', 'package'].includes(req.query.reviewType)) {
+    query.reviewType = req.query.reviewType;
+  }
 
   const reviews = await Review.find(query)
     .populate('user', 'fullName email username')
