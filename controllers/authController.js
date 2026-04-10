@@ -397,18 +397,6 @@ const getMe = asyncHandler(async (req, res) => {
 const updateProfile = asyncHandler(async (req, res) => {
   const { fullName, phone, age, gender, address, bio, preferredTravelType, profileCompleted, avatar } = req.body;
   const user = await User.findByIdAndUpdate(req.user._id, { ...(fullName && { fullName }), ...(phone && { phone }), ...(age && { age: parseInt(age) }), ...(gender && { gender: gender.toLowerCase() }), ...(address !== undefined && { address }), ...(bio !== undefined && { bio }), ...(preferredTravelType && { preferredTravelType }), ...(profileCompleted !== undefined && { profileCompleted }), ...(avatar !== undefined && { avatar }) }, { new: true, runValidators: false });
-
-  // ✅ FIX: When avatar changes, sync userSnapshot.avatar in all existing reviews
-  // so hotel/package review sections always reflect the latest profile picture.
-  if (avatar !== undefined) {
-    await Review.updateMany(
-      { user: req.user._id },
-      { $set: { 'userSnapshot.avatar': avatar } }
-    ).catch(err => {
-      // Non-critical — log but don't fail the profile update
-      logger.warn(`Failed to sync review avatars for user ${req.user._id}: ${err.message}`);
-    });
-  }
   res.json({
     success: true,
     message: 'Profile updated successfully',

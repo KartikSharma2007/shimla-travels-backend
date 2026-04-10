@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');  // ✅ FIX: moved to top — was declared after first use
-const { Review, Hotel, Package, Booking, User } = require('../models');
+const { Review, Hotel, Package, Booking } = require('../models');
 const logger = require('../utils/logger');
 const { asyncHandler, AppError } = require('../middleware/errorHandler');
 
@@ -122,18 +122,6 @@ const getReviews = asyncHandler(async (req, res) => {
   const result = await Review.getReviewsForItem(itemId, itemType, { page, limit, sortBy });
   const stats = await Review.getRatingStats(itemId, itemType);
 
-  // ✅ FIX: Fetch live avatars from User collection so reviews always show
-  // the current profile picture, never the stale snapshot saved at post time.
-  const userIds = [...new Set(
-    result.reviews.map(r => r.user).filter(Boolean)
-  )];
-  const liveUsers = userIds.length
-    ? await User.find({ _id: { $in: userIds } }, { _id: 1, avatar: 1 }).lean()
-    : [];
-  const liveAvatarMap = Object.fromEntries(
-    liveUsers.map(u => [String(u._id), u.avatar || null])
-  );
-
   res.json({
     success: true,
     data: {
@@ -142,12 +130,8 @@ const getReviews = asyncHandler(async (req, res) => {
         rating: review.rating,
         comment: review.comment,
         title: review.title,
-        travelType: review.travelType,
         reviewerName: review.isUserDeleted ? 'Deleted User' : (review.userSnapshot?.fullName || 'Anonymous'),
-        // ✅ Priority: live DB avatar → stored snapshot fallback → null
-        reviewerAvatar: review.isUserDeleted
-          ? null
-          : (liveAvatarMap[String(review.user)] ?? review.userSnapshot?.avatar ?? null),
+        reviewerAvatar: review.isUserDeleted ? null : (review.userSnapshot?.avatar || null),
         isVerified: review.isVerified,
         isUserDeleted: review.isUserDeleted,
         helpful: review.helpful,
@@ -316,4 +300,3 @@ module.exports = {
   markHelpful,
   canReview,
 };
-//hello
