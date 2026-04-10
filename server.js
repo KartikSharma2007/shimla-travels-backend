@@ -77,6 +77,12 @@ app.get('/', (req, res) => {
   res.json({ success: true, message: 'Shimla Travels API', version: '1.0.0' });
 });
 
+// ── Keep-alive ping — called by frontend to prevent Render cold starts ─────────
+// Returns immediately; also used by UptimeRobot / cron-job.org for free pinging
+app.get('/ping', (req, res) => {
+  res.json({ ok: true, ts: Date.now() });
+});
+
 // ── Email diagnosis ───────────────────────────────────────────────────────────
 app.get('/api/v1/email-diagnosis', async (req, res) => {
   const apiKey = process.env.BREVO_API_KEY;
