@@ -292,22 +292,24 @@ const googleLogin = asyncHandler(async (req, res) => {
   }
 
   // ── CONDITION 3: Existing local account — same email used with Google button ──
-  // The user originally signed up with email+password, and is now clicking the
-  // Google button using the same email. We cannot silently log them in because
-  // we need to confirm they own this local account (Google only proves they own
-  // the Gmail address — not that they know the local password).
-  // Solution: tell the frontend to show a "Enter your password" modal.
-  // Once they enter the correct password, we link the Google account and log them in.
   if (user && user.authProvider === 'local') {
+    // Block if email is not verified — Google login should not bypass email verification
+    if (!user.isEmailVerified) {
+      throw new AppError(
+        'Please verify your email before logging in. Check your inbox or request a new verification link.',
+        403,
+        'EMAIL_NOT_VERIFIED'
+      );
+    }
     logger.info(`Google login attempted on local account: ${user.email} — requesting password confirmation`);
     return res.json({
       success: true,
       message: 'This email is registered with a password. Please enter your password to continue.',
       data: {
-        needsLocalPassword: true,   // frontend shows the "enter password" modal
+        needsLocalPassword: true,
         email: user.email,
         fullName: user.fullName,
-        googleId,                   // frontend sends this back with the password
+        googleId,
       },
     });
   }
