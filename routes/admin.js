@@ -17,6 +17,8 @@ router.get('/stats', adminController.getDashboardStats);
 
 // ── Bookings ─────────────────────────────────────────────────────────────────
 router.get('/bookings', adminController.getAllBookings);
+router.put('/bookings/bulk-confirm', adminController.bulkConfirmBookings);
+router.put('/bookings/bulk-cancel', adminController.bulkCancelBookings);
 router.get('/bookings/:id', adminController.getBookingDetail);
 router.put('/bookings/:id/confirm', adminController.confirmBooking);
 router.put('/bookings/:id/cancel', adminController.cancelBooking);

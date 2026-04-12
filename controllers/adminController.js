@@ -268,6 +268,71 @@ const cancelBooking = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc    Bulk confirm all eligible bookings (upcoming / pending)
+// @route   PUT /api/admin/bookings/bulk-confirm
+// @access  Admin
+const bulkConfirmBookings = asyncHandler(async (req, res) => {
+  const { status, type } = req.query;
+
+  const query = { status: { $in: ['upcoming', 'pending'] } };
+  if (status && ['upcoming', 'pending'].includes(status)) query.status = status;
+  if (type) query.bookingType = type;
+
+  const result = await Booking.updateMany(query, {
+    $set: {
+      status: 'confirmed',
+      confirmedAt: new Date(),
+      confirmedBy: req.user._id,
+      adminNotes: req.body.adminNotes || 'Bulk confirmed by admin',
+    },
+  });
+
+  logger.info(`Admin ${req.user.email} bulk-confirmed ${result.modifiedCount} bookings`);
+  await logAdminAction(req, 'BULK_CONFIRM_BOOKINGS', 'Booking', null, {
+    count: result.modifiedCount,
+    filters: { status, type },
+  });
+
+  res.json({
+    success: true,
+    message: `${result.modifiedCount} booking(s) confirmed successfully`,
+    data: { modifiedCount: result.modifiedCount },
+  });
+});
+
+// @desc    Bulk cancel all eligible bookings (not already cancelled/completed)
+// @route   PUT /api/admin/bookings/bulk-cancel
+// @access  Admin
+const bulkCancelBookings = asyncHandler(async (req, res) => {
+  const { status, type } = req.query;
+
+  const query = { status: { $nin: ['cancelled', 'completed'] } };
+  if (status && !['cancelled', 'completed'].includes(status)) query.status = status;
+  if (type) query.bookingType = type;
+
+  const result = await Booking.updateMany(query, {
+    $set: {
+      status: 'cancelled',
+      cancelledAt: new Date(),
+      cancelledBy: 'admin',
+      cancellationReason: req.body.reason || 'Bulk cancelled by admin',
+      adminNotes: req.body.adminNotes || 'Bulk cancelled by admin',
+    },
+  });
+
+  logger.info(`Admin ${req.user.email} bulk-cancelled ${result.modifiedCount} bookings`);
+  await logAdminAction(req, 'BULK_CANCEL_BOOKINGS', 'Booking', null, {
+    count: result.modifiedCount,
+    filters: { status, type },
+  });
+
+  res.json({
+    success: true,
+    message: `${result.modifiedCount} booking(s) cancelled successfully`,
+    data: { modifiedCount: result.modifiedCount },
+  });
+});
+
 // @desc    Update admin notes on a booking
 // @route   PUT /api/admin/bookings/:id/notes
 const updateBookingNotes = asyncHandler(async (req, res) => {
@@ -615,6 +680,8 @@ module.exports = {
   getBookingDetail,
   confirmBooking,
   cancelBooking,
+  bulkConfirmBookings,
+  bulkCancelBookings,
   updateBookingNotes,
   getAllUsers,
   getUserDetail,
