@@ -43,14 +43,17 @@ const setupCronJobs = () => {
 };
 setupCronJobs();
 
-// Security
 app.use(helmet({ contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], styleSrc: ["'self'", "'unsafe-inline'"], scriptSrc: ["'self'"], imgSrc: ["'self'", "data:", "https:"] } } }));
 
-const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173').split(',').map(o => o.trim());
+const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173')
+  .split(',').map(o => o.trim()).filter(Boolean);
+
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) callback(null, true);
-    else callback(new Error('Not allowed by CORS'));
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    logger.warn(`CORS blocked: ${origin}`);
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -72,75 +75,16 @@ app.use(morgan('combined', { stream: logger.stream }));
 app.use('/api', apiLimiter);
 app.use('/api', routes);
 
-// Root
 app.get('/', (req, res) => {
   res.json({ success: true, message: 'Shimla Travels API', version: '1.0.0' });
 });
 
-// ── Keep-alive ping — called by frontend to prevent Render cold starts ─────────
-// Returns immediately; also used by UptimeRobot / cron-job.org for free pinging
+// Keep-alive ping for Render free tier / UptimeRobot
 app.get('/ping', (req, res) => {
   res.json({ ok: true, ts: Date.now() });
 });
 
-// ── Email diagnosis ───────────────────────────────────────────────────────────
-app.get('/api/v1/email-diagnosis', async (req, res) => {
-  const apiKey = process.env.BREVO_API_KEY;
-  res.json({
-    timestamp: new Date().toISOString(),
-    emailService: 'Brevo (HTTP API — works on Render free tier)',
-    BREVO_API_KEY: apiKey ? `SET (${apiKey.substring(0, 12)}...)` : 'NOT SET — add to Render Environment tab',
-    SUPPORT_EMAIL: process.env.SUPPORT_EMAIL || 'not set',
-    NODE_ENV: process.env.NODE_ENV,
-    CLIENT_URL: process.env.CLIENT_URL,
-    next: 'Open /api/v1/test-send-email?to=youremail@gmail.com to test',
-  });
-});
-
-// ── Test send email ───────────────────────────────────────────────────────────
-app.get('/api/v1/test-send-email', async (req, res) => {
-  const https = require('https');
-  const apiKey = process.env.BREVO_API_KEY;
-  const toEmail = req.query.to;
-
-  if (!toEmail) return res.json({ error: 'Add ?to=youremail@gmail.com to the URL' });
-  if (!apiKey) return res.json({ error: 'BREVO_API_KEY not set on Render — add it in Environment tab' });
-
-  const payload = JSON.stringify({
-    sender: { name: 'Shimla Travels', email: 'shimlaatravels@gmail.com' },
-    to: [{ email: toEmail }],
-    subject: 'Test Email from Shimla Travels — ' + new Date().toISOString(),
-    htmlContent: '<h2>Test Email</h2><p>Brevo email is working from Render!</p>',
-    textContent: 'Test email from Shimla Travels. Brevo is working!',
-  });
-
-  const options = {
-    hostname: 'api.brevo.com',
-    path: '/v3/smtp/email',
-    method: 'POST',
-    headers: {
-      'accept': 'application/json',
-      'content-type': 'application/json',
-      'api-key': apiKey,
-    },
-  };
-
-  const req2 = https.request(options, (r) => {
-    let data = '';
-    r.on('data', c => data += c);
-    r.on('end', () => {
-      if (r.statusCode >= 200 && r.statusCode < 300) {
-        res.json({ success: true, to: toEmail, message: 'Email sent! Check inbox AND spam folder of ' + toEmail });
-      } else {
-        try { res.json({ success: false, to: toEmail, error: JSON.parse(data) }); }
-        catch { res.json({ success: false, to: toEmail, error: data }); }
-      }
-    });
-  });
-  req2.on('error', e => res.json({ success: false, error: e.message }));
-  req2.write(payload);
-  req2.end();
-});
+// Debug endpoints removed — they exposed internal config publicly.
 
 app.use(notFound);
 app.use(errorHandler);

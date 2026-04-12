@@ -156,6 +156,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  emailVerificationExpires: {
+    type: Date,
+    default: null,
+  },
   loginAttempts: {
     type: Number,
     default: 0,

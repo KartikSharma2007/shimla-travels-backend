@@ -259,3 +259,22 @@ module.exports = {
   sendBookingCancellationEmail,
   sendContactFormEmail,
 };
+
+// ─── Email Verification ────────────────────────────────────────────────────────
+const sendEmailVerificationEmail = async (toEmail, userName, verifyToken) => {
+  const clientUrl = process.env.CLIENT_URL || 'https://shimla-travels.netlify.app';
+  const verifyUrl = `${clientUrl}/verify-email/${verifyToken}`;
+
+  try {
+    await _send('EMAIL VERIFICATION', {
+      to: toEmail,
+      subject: 'Verify your email — Shimla Travels',
+      textContent: `Hi ${userName},\n\nPlease verify your email by clicking:\n${verifyUrl}\n\nThis link expires in 24 hours.\n\n— Shimla Travels`,
+      htmlContent: `<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>body{font-family:'Segoe UI',Arial,sans-serif;background:#f4f6f9;margin:0;padding:0}.w{max-width:600px;margin:40px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.1)}.h{background:linear-gradient(135deg,#0f6e56,#1D9E75);padding:32px 40px;text-align:center}.h h1{color:#fff;margin:0;font-size:22px;font-weight:700}.b{padding:36px 40px;color:#2d3748;font-size:15px;line-height:1.7}.btn{display:block;width:fit-content;margin:24px auto;background:linear-gradient(135deg,#0f6e56,#1D9E75);color:#fff!important;text-decoration:none;padding:14px 36px;border-radius:10px;font-size:16px;font-weight:700;text-align:center}.note{font-size:13px;color:#718096;margin-top:20px;text-align:center}.f{background:#f7fafc;padding:20px 40px;text-align:center;font-size:12px;color:#718096}</style></head><body><div class="w"><div class="h"><h1>Verify your email</h1></div><div class="b"><p>Hi <strong>${userName}</strong>,</p><p>Welcome to Shimla Travels! One quick step — please verify your email address to activate your account.</p><a href="${verifyUrl}" class="btn">Verify Email Address</a><div class="note">This link expires in <strong>24 hours</strong>.<br/>If you did not sign up, you can safely ignore this email.</div></div><div class="f">© ${new Date().getFullYear()} Shimla Travels &nbsp;|&nbsp; <a href="${clientUrl}">shimla-travels.netlify.app</a></div></div></body></html>`,
+    });
+  } catch (err) {
+    console.error(`[EMAIL] VERIFICATION EMAIL FAILED for ${toEmail}: ${err.message}`);
+  }
+};
+
+module.exports.sendEmailVerificationEmail = sendEmailVerificationEmail;

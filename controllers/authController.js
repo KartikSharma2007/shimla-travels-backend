@@ -14,7 +14,7 @@ const jwt = require('jsonwebtoken'); // moved here — was incorrectly placed in
 const { OAuth2Client } = require('google-auth-library');
 const { User, Booking, Review, SavedItem } = require('../models');
 const logger = require('../utils/logger');
-const { sendPasswordResetEmail, sendPasswordChangedEmail } = require('../utils/emailService'); // ← NEW
+const { sendPasswordResetEmail, sendPasswordChangedEmail, sendEmailVerificationEmail } = require('../utils/emailService');
 const {
   generateToken,
   setTokenCookie,
@@ -35,6 +35,8 @@ const register = asyncHandler(async (req, res) => {
   if (existingUser) throw new AppError('Email already registered', 409, 'EMAIL_EXISTS');
   const existingUsername = await User.findOne({ username: username?.toLowerCase() });
   if (existingUsername) throw new AppError('Username already taken', 409, 'USERNAME_TAKEN');
+
+  // Create user with email NOT yet verified
   const user = await User.create({
     fullName,
     age,
@@ -45,38 +47,114 @@ const register = asyncHandler(async (req, res) => {
     phone,
     address,
     password,
-    // Auto-verify email on normal signup — we don't have a verification email
-    // flow built yet. When you add email verification later, remove this line
-    // and send a verification email here instead.
-    isEmailVerified: true,
+    isEmailVerified: false,
   });
-  const token = generateToken(user._id);
-  setTokenCookie(res, token);
+
+  // Generate verification token and send email
+  const verifyToken = user.createEmailVerificationToken();
+  // Store token expiry (24 hours)
+  user.emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000;
+  await user.save({ validateBeforeSave: false });
+
+  // Fire-and-forget — don't block registration if email fails
+  sendEmailVerificationEmail(user.email, user.fullName, verifyToken).catch((err) => {
+    logger.error(`Failed to send verification email to ${user.email}: ${err.message}`);
+  });
+
+  // Return user but NO login token yet — they must verify first
   res.status(201).json({
     success: true,
-    message: 'Registration successful',
+    message: 'Registration successful! Please check your email to verify your account.',
+    data: {
+      requiresVerification: true,
+      email: user.email,
+    },
+  });
+});
+
+// ── Verify Email ──────────────────────────────────────────────────────────────
+const verifyEmail = asyncHandler(async (req, res) => {
+  const { token } = req.params;
+
+  // Hash the raw token from URL to match what's stored in DB
+  const hashedToken = require('crypto')
+    .createHash('sha256')
+    .update(token)
+    .digest('hex');
+
+  const user = await User.findOne({
+    emailVerificationToken: hashedToken,
+    emailVerificationExpires: { $gt: Date.now() },
+  });
+
+  if (!user) {
+    throw new AppError(
+      'Verification link is invalid or has expired. Please request a new one.',
+      400,
+      'INVALID_VERIFICATION_TOKEN'
+    );
+  }
+
+  // Mark email as verified and clear token
+  user.isEmailVerified = true;
+  user.emailVerificationToken = undefined;
+  user.emailVerificationExpires = undefined;
+  await user.save({ validateBeforeSave: false });
+
+  // Log the user in automatically after verification
+  const authToken = generateToken(user._id);
+  setTokenCookie(res, authToken);
+
+  logger.info(`Email verified for user: ${user.email}`);
+
+  res.json({
+    success: true,
+    message: 'Email verified successfully! Welcome to Shimla Travels.',
     data: {
       user: {
         id: user._id,
         fullName: user.fullName,
-        age: user.age,
-        gender: user.gender,
-        username: user.username,
-        preferredTravelType: user.preferredTravelType,
         email: user.email,
-        phone: user.phone,
-        address: user.address,
-        bio: user.bio,
+        username: user.username,
         role: user.role,
-        avatar: user.avatar,
-        isEmailVerified: user.isEmailVerified,
-        profileCompleted: user.profileCompleted, // needed by isProfileComplete()
-        authProvider: user.authProvider,     // needed to know if Google/local
-        hasPassword: user.hasPassword,       // needed for Google flow
+        isEmailVerified: true,
+        authProvider: user.authProvider,
+        hasPassword: user.hasPassword,
+        profileCompleted: user.profileCompleted,
         createdAt: user.createdAt,
       },
-      token,
+      token: authToken,
     },
+  });
+});
+
+// ── Resend Verification Email ─────────────────────────────────────────────────
+const resendVerificationEmail = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) throw new AppError('Email is required', 400, 'EMAIL_REQUIRED');
+
+  const user = await User.findOne({ email: email.toLowerCase() });
+
+  // Always return success to prevent email enumeration attacks
+  if (!user || user.isEmailVerified) {
+    return res.json({
+      success: true,
+      message: 'If that email exists and is unverified, a new link has been sent.',
+    });
+  }
+
+  const verifyToken = user.createEmailVerificationToken();
+  user.emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000;
+  await user.save({ validateBeforeSave: false });
+
+  sendEmailVerificationEmail(user.email, user.fullName, verifyToken).catch((err) => {
+    logger.error(`Failed to resend verification email to ${user.email}: ${err.message}`);
+  });
+
+  res.json({
+    success: true,
+    message: 'If that email exists and is unverified, a new link has been sent.',
   });
 });
 
@@ -127,6 +205,15 @@ const login = asyncHandler(async (req, res) => {
   if (user.isLocked()) throw new AppError('Account temporarily locked due to multiple failed attempts. Please try again later.', 423, 'ACCOUNT_LOCKED');
   const isMatch = await user.comparePassword(password);
   if (!isMatch) { await user.incrementLoginAttempts(); throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS'); }
+
+  // Block unverified email accounts (Google OAuth users are auto-verified)
+  if (!user.isEmailVerified && user.authProvider === 'local') {
+    throw new AppError(
+      'Please verify your email before logging in. Check your inbox or request a new verification link.',
+      403,
+      'EMAIL_NOT_VERIFIED'
+    );
+  }
   if (user.loginAttempts > 0) await user.updateOne({ $set: { loginAttempts: 0 }, $unset: { lockUntil: 1 } });
   user.lastLoginAt = new Date();
   user.lastLoginIp = req.ip;
@@ -693,6 +780,8 @@ const linkGoogleAccount = asyncHandler(async (req, res) => {
 
 module.exports = {
   register,
+  verifyEmail,
+  resendVerificationEmail,
   login,
   googleLogin,
   setGooglePassword,

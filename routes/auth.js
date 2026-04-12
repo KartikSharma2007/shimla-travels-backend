@@ -25,6 +25,8 @@ const {
 // ── Public routes ─────────────────────────────────────────────────────────────
 router.post('/register', authLimiter, registerValidator, authController.register);
 router.post('/login', authLimiter, loginValidator, authController.login);
+router.get('/verify-email/:token', authController.verifyEmail);
+router.post('/resend-verification', authLimiter, authController.resendVerificationEmail);
 router.post('/google', authLimiter, authController.googleLogin);
 router.post('/google/set-password', authLimiter, authController.setGooglePassword);
 router.post('/google/confirm-password', authLimiter, authController.googleConfirmPassword);
