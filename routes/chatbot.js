@@ -1,33 +1,33 @@
+// Backend/routes/chatbot.js
+//
+// Chatbot proxy — uses Google Gemini API (FREE tier, no credit card needed).
+// Get your free API key at: https://aistudio.google.com/app/apikey
+// Add to your .env: GEMINI_API_KEY=your_key_here
+// Also add on Render dashboard under Environment Variables.
+
 const express = require('express');
 const router = express.Router();
 const https = require('https');
 const logger = require('../utils/logger');
 
-const SYSTEM_PROMPT = `You are a friendly, knowledgeable travel assistant for Shimla Travels — a travel booking platform specialising in trips to Shimla, Himachal Pradesh, India.
+const SYSTEM_CONTEXT = `You are a friendly, knowledgeable travel assistant for Shimla Travels — a travel booking platform for trips to Shimla, Himachal Pradesh, India.
 
-Your role:
-- Help users discover hotels, travel packages, and attractions in and around Shimla
-- Answer questions about travel, booking, weather, best times to visit, and local tips
-- Help users with their bookings, cancellations, and account questions
-- Be warm, concise, and genuinely helpful
-
-Key information about Shimla Travels:
+Key facts:
 - Website: shimla-travels.netlify.app
-- Email: shimlaatravels@gmail.com
-- Support phone: +919876543210
+- Email: shimlaatravels@gmail.com  
+- Phone: +919876543210
 - Services: Hotel bookings, travel packages, guided tours, adventure activities
 - Popular packages: Shimla sightseeing, Kufri day trip, Manali-Shimla combo, Spiti Valley, Chail
 - Popular hotels: The Oberoi Cecil, Wildflower Hall, Radisson Blu, Hotel Combermere
-- Top attractions: Mall Road, Jakhu Temple, Christ Church, Ridge, Kufri, Chail, Naldehra
-- Best time to visit: March-June (summer, pleasant 15-25°C), Dec-Feb (snow, -5 to 10°C), avoid heavy monsoon Jul-Aug
-- Payment: Demo mode — no real charges are processed on this platform
+- Top attractions: Mall Road, Jakhu Temple, Christ Church, The Ridge, Kufri, Chail, Naldehra
+- Best time: March-June (pleasant 15-25°C), Dec-Feb (snow -5 to 10°C), avoid Jul-Aug monsoon
+- Payments are demo mode — no real charges
 
-Personality:
-- Friendly and enthusiastic about Shimla
-- Concise — keep responses under 120 words unless the user asks for detail
-- Use bullet points only when listing 3+ items
-- Never make up specific prices or availability — direct users to browse the site
-- If asked about something completely unrelated to travel, politely redirect`;
+Rules:
+- Be warm, helpful, concise (under 120 words unless asked for detail)
+- Use bullet points only for 3+ items
+- Never make up prices or availability
+- If asked something unrelated to travel, politely redirect`;
 
 // POST /api/v1/chatbot/message
 router.post('/message', async (req, res) => {
@@ -37,30 +37,46 @@ router.post('/message', async (req, res) => {
         return res.status(400).json({ success: false, message: 'messages array is required' });
     }
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-        logger.error('ANTHROPIC_API_KEY is not set in environment variables');
+        logger.error('GEMINI_API_KEY is not set');
         return res.status(503).json({
             success: false,
-            message: 'Chatbot service is not configured. Please add ANTHROPIC_API_KEY to your environment variables.',
+            message: 'Chatbot is not configured. Please add GEMINI_API_KEY to your environment variables. Get a free key at https://aistudio.google.com/app/apikey',
         });
     }
 
+    // Convert messages to Gemini format
+    // Gemini uses "user" and "model" roles (not "assistant")
+    const geminiContents = messages.map(m => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }],
+    }));
+
+    // Prepend system context as a user/model pair (Gemini doesn't have a system role)
+    const contentsWithSystem = [
+        { role: 'user', parts: [{ text: SYSTEM_CONTEXT }] },
+        { role: 'model', parts: [{ text: 'Understood! I am the Shimla Travels assistant, ready to help.' }] },
+        ...geminiContents,
+    ];
+
     const payload = JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 400,
-        system: SYSTEM_PROMPT,
-        messages,
+        contents: contentsWithSystem,
+        generationConfig: {
+            maxOutputTokens: 400,
+            temperature: 0.7,
+        },
     });
 
+    const path = `/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
     const options = {
-        hostname: 'api.anthropic.com',
-        path: '/v1/messages',
+        hostname: 'generativelanguage.googleapis.com',
+        path,
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
+            'Content-Length': Buffer.byteLength(payload),
         },
     };
 
@@ -71,24 +87,26 @@ router.post('/message', async (req, res) => {
             try {
                 const parsed = JSON.parse(data);
                 if (proxyRes.statusCode >= 200 && proxyRes.statusCode < 300) {
-                    const text = parsed.content?.[0]?.text ?? '';
+                    const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+                    if (!text) {
+                        logger.error('Gemini returned empty response');
+                        return res.status(502).json({ success: false, message: 'AI returned an empty response. Please try again.' });
+                    }
                     return res.json({ success: true, reply: text });
                 } else {
-                    logger.error(`Anthropic API error ${proxyRes.statusCode}: ${data}`);
-                    return res.status(502).json({
-                        success: false,
-                        message: 'AI service returned an error. Please try again.',
-                    });
+                    const errMsg = parsed?.error?.message || data;
+                    logger.error(`Gemini API error ${proxyRes.statusCode}: ${errMsg}`);
+                    return res.status(502).json({ success: false, message: 'AI service error. Please try again.' });
                 }
             } catch (e) {
-                logger.error(`Failed to parse Anthropic response: ${e.message}`);
+                logger.error(`Failed to parse Gemini response: ${e.message}`);
                 return res.status(502).json({ success: false, message: 'Invalid response from AI service.' });
             }
         });
     });
 
     proxyReq.on('error', (err) => {
-        logger.error(`Anthropic proxy request failed: ${err.message}`);
+        logger.error(`Gemini proxy request failed: ${err.message}`);
         res.status(503).json({ success: false, message: 'Could not reach AI service. Please try again.' });
     });
 
