@@ -1,42 +1,58 @@
 // Backend/routes/chatbot.js
-// Uses Google Gemini 1.5 Flash (FREE)
-// Get key: https://aistudio.google.com/app/apikey
-// Add to Render env vars: GEMINI_API_KEY=your_key
+// Uses Groq API — FREE, no credit card, 14,400 requests/day
+// Get free key: https://console.groq.com → API Keys → Create API Key
+// Add to Render env vars: GROQ_API_KEY=your_key
 
 const express = require('express');
 const router = express.Router();
 const https = require('https');
 const logger = require('../utils/logger');
 
-const SYSTEM_CONTEXT = `You are a friendly travel assistant for Shimla Travels, a booking platform for Shimla, Himachal Pradesh, India. Help users with hotels, packages, attractions, weather, and travel tips. Be warm and concise (under 120 words). Key info: best time March-June (15-25C) or Dec-Feb (snow). Top spots: Mall Road, Jakhu Temple, Kufri, The Ridge. Email: shimlaatravels@gmail.com`;
+const SYSTEM_PROMPT = `You are a friendly travel assistant for Shimla Travels, a booking platform for Shimla, Himachal Pradesh, India.
 
-// ── GET /api/v1/chatbot/test — browser-accessible diagnostic ─────────────────
-// Visit: https://your-backend.onrender.com/api/v1/chatbot/test
-// Shows exactly what's wrong without needing to check logs
+Key information:
+- Website: shimla-travels.netlify.app
+- Email: shimlaatravels@gmail.com, Phone: +919876543210  
+- Services: Hotel bookings, travel packages, guided tours, adventure activities
+- Popular packages: Shimla sightseeing, Kufri day trip, Manali-Shimla combo, Spiti Valley, Chail
+- Popular hotels: The Oberoi Cecil, Wildflower Hall, Radisson Blu, Hotel Combermere
+- Top attractions: Mall Road, Jakhu Temple, Christ Church, The Ridge, Kufri, Chail, Naldehra
+- Best time to visit: March-June (pleasant, 15-25°C) or December-February (snow, -5 to 10°C)
+- Avoid: July-August (heavy monsoon)
+- Payments are demo mode only — no real charges processed
+
+Rules:
+- Be warm, helpful, and concise (under 120 words unless asked for detail)
+- Use bullet points only when listing 3 or more items
+- Never make up specific prices or availability
+- If asked something unrelated to travel, politely redirect to Shimla travel topics`;
+
+// ── GET /api/v1/chatbot/test ─────────────────────────────────────────────────
 router.get('/test', async (req, res) => {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GROQ_API_KEY;
 
     if (!apiKey) {
         return res.json({
             status: 'ERROR',
-            problem: 'GEMINI_API_KEY is not set in your Render environment variables',
-            fix: 'Go to Render → your backend service → Environment → Add Variable → GEMINI_API_KEY = your key',
-            getKey: 'https://aistudio.google.com/app/apikey',
+            problem: 'GROQ_API_KEY is not set in Render environment variables',
+            fix: 'Render dashboard → your backend → Environment → Add Variable: GROQ_API_KEY',
+            getKey: 'https://console.groq.com → API Keys → Create API Key (free, no credit card)',
         });
     }
 
-    // Try a minimal Gemini request
     const payload = JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: 'Say hello in one word.' }] }],
-        generationConfig: { maxOutputTokens: 10 },
+        model: 'llama3-8b-8192',
+        messages: [{ role: 'user', content: 'Say hello in one word.' }],
+        max_tokens: 10,
     });
 
     const options = {
-        hostname: 'generativelanguage.googleapis.com',
-        path: `/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`,
+        hostname: 'api.groq.com',
+        path: '/openai/v1/chat/completions',
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
             'Content-Length': Buffer.byteLength(payload),
         },
     };
@@ -50,11 +66,7 @@ router.get('/test', async (req, res) => {
             testRes.on('data', chunk => responseData += chunk);
             testRes.on('end', resolve);
         });
-        testReq.on('error', (err) => {
-            responseData = err.message;
-            statusCode = 0;
-            resolve();
-        });
+        testReq.on('error', (err) => { responseData = err.message; statusCode = 0; resolve(); });
         testReq.write(payload);
         testReq.end();
     });
@@ -63,26 +75,25 @@ router.get('/test', async (req, res) => {
     try { parsed = JSON.parse(responseData); } catch { parsed = null; }
 
     if (statusCode === 200) {
-        const reply = parsed?.candidates?.[0]?.content?.parts?.[0]?.text;
+        const reply = parsed?.choices?.[0]?.message?.content;
         return res.json({
             status: 'OK',
-            message: 'Gemini is working correctly!',
-            geminiReply: reply,
+            message: 'Groq is working! Chatbot is ready.',
+            groqReply: reply,
+            model: 'llama3-8b-8192',
             keyPrefix: `${apiKey.substring(0, 8)}...`,
         });
     }
 
-    const geminiError = parsed?.error?.message || parsed?.error?.status || responseData;
-
+    const groqError = parsed?.error?.message || responseData;
     return res.json({
         status: 'ERROR',
         httpStatus: statusCode,
-        geminiError,
+        groqError,
         keyPrefix: `${apiKey.substring(0, 8)}...`,
-        fix: statusCode === 400 ? 'API key format looks wrong — make sure you copied the full key from aistudio.google.com/app/apikey'
-            : statusCode === 401 || statusCode === 403 ? 'API key is invalid or has been revoked — generate a new one at aistudio.google.com/app/apikey'
-                : statusCode === 429 ? 'Rate limit hit — wait 60 seconds and try again'
-                    : `Unexpected error — check Render logs for details`,
+        fix: statusCode === 401 ? 'API key is invalid — check it at console.groq.com'
+            : statusCode === 429 ? 'Rate limit — wait a minute and try again'
+                : 'Check Render logs for more details',
     });
 });
 
@@ -94,34 +105,32 @@ router.post('/message', async (req, res) => {
         return res.status(400).json({ success: false, message: 'messages array is required' });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
         return res.status(503).json({
             success: false,
-            message: 'Chatbot not configured. Visit /api/v1/chatbot/test for setup instructions.',
+            message: 'Chatbot not configured. Visit /api/v1/chatbot/test for setup help.',
         });
     }
 
-    const contents = [
-        { role: 'user', parts: [{ text: SYSTEM_CONTEXT }] },
-        { role: 'model', parts: [{ text: 'Ready to help with Shimla travel!' }] },
-        ...messages.map(m => ({
-            role: m.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: String(m.content || '') }],
-        })),
-    ];
-
+    // Groq uses OpenAI-compatible format — easy!
     const payload = JSON.stringify({
-        contents,
-        generationConfig: { maxOutputTokens: 400, temperature: 0.7 },
+        model: 'llama3-8b-8192',
+        messages: [
+            { role: 'system', content: SYSTEM_PROMPT },
+            ...messages, // already in { role, content } format from frontend
+        ],
+        max_tokens: 400,
+        temperature: 0.7,
     });
 
     const options = {
-        hostname: 'generativelanguage.googleapis.com',
-        path: `/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`,
+        hostname: 'api.groq.com',
+        path: '/openai/v1/chat/completions',
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
             'Content-Length': Buffer.byteLength(payload),
         },
     };
@@ -130,42 +139,37 @@ router.post('/message', async (req, res) => {
         let data = '';
         proxyRes.on('data', chunk => data += chunk);
         proxyRes.on('end', () => {
-            logger.info(`Gemini response status: ${proxyRes.statusCode}`);
+            logger.info(`Groq response status: ${proxyRes.statusCode}`);
 
             try {
                 const parsed = JSON.parse(data);
 
                 if (proxyRes.statusCode === 200) {
-                    const text = parsed?.candidates?.[0]?.content?.parts?.[0]?.text;
+                    const text = parsed?.choices?.[0]?.message?.content;
                     if (!text) {
-                        logger.error(`Gemini empty reply: ${JSON.stringify(parsed)}`);
+                        logger.error(`Groq empty reply: ${JSON.stringify(parsed)}`);
                         return res.status(502).json({ success: false, message: 'AI returned empty response. Please try again.' });
                     }
                     return res.json({ success: true, reply: text });
                 }
 
-                const geminiError = parsed?.error?.message || parsed?.error?.status || data;
-                logger.error(`Gemini error ${proxyRes.statusCode}: ${geminiError}`);
+                const groqError = parsed?.error?.message || data;
+                logger.error(`Groq error ${proxyRes.statusCode}: ${groqError}`);
 
                 let userMessage = 'AI service error. Please try again.';
-                if (proxyRes.statusCode === 401 || proxyRes.statusCode === 403) {
-                    userMessage = 'Chatbot API key is invalid. Visit /api/v1/chatbot/test for help.';
-                } else if (proxyRes.statusCode === 429) {
-                    userMessage = 'Too many requests. Please wait a moment and try again.';
-                } else if (proxyRes.statusCode === 400) {
-                    userMessage = 'Bad request to AI service. Check /api/v1/chatbot/test for diagnosis.';
-                }
+                if (proxyRes.statusCode === 401) userMessage = 'Chatbot API key is invalid.';
+                if (proxyRes.statusCode === 429) userMessage = 'Too many requests. Please wait a moment and try again.';
 
                 return res.status(502).json({ success: false, message: userMessage });
             } catch (e) {
-                logger.error(`Parse error: ${e.message}. Raw: ${data.substring(0, 300)}`);
+                logger.error(`Groq parse error: ${e.message}`);
                 return res.status(502).json({ success: false, message: 'Invalid AI response. Please try again.' });
             }
         });
     });
 
     proxyReq.on('error', (err) => {
-        logger.error(`Gemini network error: ${err.message}`);
+        logger.error(`Groq network error: ${err.message}`);
         res.status(503).json({ success: false, message: 'Cannot reach AI service. Please try again.' });
     });
 
