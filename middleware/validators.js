@@ -30,7 +30,15 @@ const handleValidationErrors = (req, res, next) => {
 const registerValidator = [
   body('fullName').trim().notEmpty().withMessage('Full name is required')
     .isLength({ min: 2, max: 100 }).withMessage('Name must be 2-100 characters'),
-  body('age').isInt({ min: 18, max: 100 }).withMessage('Must be 18 or older'),
+  // Use custom() so it handles both number (from JSON) and string inputs
+  body('age').custom((value) => {
+    const num = Number(value);
+    if (value === undefined || value === null || value === '') throw new Error('Age is required');
+    if (isNaN(num) || !Number.isInteger(num)) throw new Error('Age must be a whole number');
+    if (num < 18) throw new Error('Must be 18 or older');
+    if (num > 120) throw new Error('Please enter a valid age');
+    return true;
+  }),
   body('gender')
     .isIn(['male', 'female', 'other', 'Male', 'Female', 'Other'])
     .withMessage('Invalid gender'),
@@ -40,7 +48,8 @@ const registerValidator = [
   body('preferredTravelType')
     .notEmpty().withMessage('Travel type is required')
     .isIn(['adventure', 'family', 'honeymoon', 'luxury', 'budget', 'nature'])
-    .withMessage('Invalid travel type — must be one of: adventure, family, honeymoon, luxury, budget, nature'),
+    .withMessage('Invalid travel type'),
+  // Removed .normalizeEmail() — it strips dots/aliases and causes mismatches
   body('email').trim().isEmail().withMessage('Valid email required'),
   body('phone').trim().matches(/^[\d\s\-\+\(\)]{10,}$/)
     .withMessage('Valid phone number required'),
