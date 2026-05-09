@@ -38,9 +38,10 @@ const registerValidator = [
     .isLength({ min: 3, max: 30 }).withMessage('Username must be 3-30 characters')
     .matches(/^[a-zA-Z0-9_]+$/).withMessage('Username: letters, numbers, underscores only'),
   body('preferredTravelType')
+    .notEmpty().withMessage('Travel type is required')
     .isIn(['adventure', 'family', 'honeymoon', 'luxury', 'budget', 'nature'])
-    .withMessage('Invalid travel type'),
-  body('email').trim().isEmail().withMessage('Valid email required').normalizeEmail(),
+    .withMessage('Invalid travel type — must be one of: adventure, family, honeymoon, luxury, budget, nature'),
+  body('email').trim().isEmail().withMessage('Valid email required'),
   body('phone').trim().matches(/^[\d\s\-\+\(\)]{10,}$/)
     .withMessage('Valid phone number required'),
   body('password').isLength({ min: 6 })

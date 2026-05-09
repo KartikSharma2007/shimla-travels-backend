@@ -5,6 +5,7 @@ const morgan = require('morgan');
 const compression = require('compression');
 const hpp = require('hpp');
 const mongoSanitize = require('mongo-sanitize');
+const path = require('path');
 require('dotenv').config();
 
 const connectDB = require('./config/database');
@@ -74,6 +75,19 @@ app.use((req, res, next) => {
 app.use(morgan('combined', { stream: logger.stream }));
 app.use('/api', apiLimiter);
 app.use('/api', routes);
+
+// Serve React frontend
+app.use(express.static(path.join(__dirname, '../frontend/dist')));
+
+app.get('*', (req, res, next) => {
+
+  // Skip API routes
+  if (req.originalUrl.startsWith('/api')) {
+    return next();
+  }
+
+  res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
+});
 
 app.get('/', (req, res) => {
   res.json({ success: true, message: 'Shimla Travels API', version: '1.0.0' });
