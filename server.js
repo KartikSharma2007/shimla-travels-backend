@@ -16,33 +16,37 @@ const { apiLimiter } = require('./middleware/rateLimiter');
 
 const app = express();
 
-connectDB();
+// Only connect to real Atlas DB and start cron jobs when NOT running tests
+// During tests, setup.js connects to in-memory MongoDB instead
+if (process.env.NODE_ENV !== 'test') {
+  connectDB();
 
-// Daily cron job
-const setupCronJobs = () => {
-  try {
-    const cron = require('node-cron');
-    const { Booking } = require('./models');
-    cron.schedule('0 2 * * *', async () => {
-      try {
-        const now = new Date();
-        const h = await Booking.updateMany(
-          { bookingType: 'hotel', status: { $in: ['upcoming', 'confirmed'] }, 'payment.status': 'completed', checkOut: { $lt: now } },
-          { $set: { status: 'completed' } }
-        );
-        const p = await Booking.updateMany(
-          { bookingType: 'package', status: { $in: ['upcoming', 'confirmed'] }, 'payment.status': 'completed', travelDate: { $lt: now } },
-          { $set: { status: 'completed' } }
-        );
-        logger.info(`Auto-complete: ${h.modifiedCount} hotel + ${p.modifiedCount} package bookings completed.`);
-      } catch (err) { logger.error(`Cron job failed: ${err.message}`); }
-    });
-    logger.info('Cron jobs scheduled: booking auto-complete runs daily at 02:00.');
-  } catch (err) {
-    logger.warn(`Cron jobs not started: ${err.message}`);
-  }
-};
-setupCronJobs();
+  // Daily cron job
+  const setupCronJobs = () => {
+    try {
+      const cron = require('node-cron');
+      const { Booking } = require('./models');
+      cron.schedule('0 2 * * *', async () => {
+        try {
+          const now = new Date();
+          const h = await Booking.updateMany(
+            { bookingType: 'hotel', status: { $in: ['upcoming', 'confirmed'] }, 'payment.status': 'completed', checkOut: { $lt: now } },
+            { $set: { status: 'completed' } }
+          );
+          const p = await Booking.updateMany(
+            { bookingType: 'package', status: { $in: ['upcoming', 'confirmed'] }, 'payment.status': 'completed', travelDate: { $lt: now } },
+            { $set: { status: 'completed' } }
+          );
+          logger.info(`Auto-complete: ${h.modifiedCount} hotel + ${p.modifiedCount} package bookings completed.`);
+        } catch (err) { logger.error(`Cron job failed: ${err.message}`); }
+      });
+      logger.info('Cron jobs scheduled: booking auto-complete runs daily at 02:00.');
+    } catch (err) {
+      logger.warn(`Cron jobs not started: ${err.message}`);
+    }
+  };
+  setupCronJobs();
+}
 
 app.use(helmet({ contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], styleSrc: ["'self'", "'unsafe-inline'"], scriptSrc: ["'self'"], imgSrc: ["'self'", "data:", "https:"] } } }));
 
@@ -80,12 +84,9 @@ app.use('/api', routes);
 app.use(express.static(path.join(__dirname, '../frontend/dist')));
 
 app.get('*', (req, res, next) => {
-
-  // Skip API routes
   if (req.originalUrl.startsWith('/api')) {
     return next();
   }
-
   res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
 });
 
@@ -93,24 +94,24 @@ app.get('/', (req, res) => {
   res.json({ success: true, message: 'Shimla Travels API', version: '1.0.0' });
 });
 
-// Keep-alive ping for Render free tier / UptimeRobot
 app.get('/ping', (req, res) => {
   res.json({ ok: true, ts: Date.now() });
 });
-
-// Debug endpoints removed — they exposed internal config publicly.
 
 app.use(notFound);
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
-const server = app.listen(PORT, '0.0.0.0', () => {
-  logger.info(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
-});
 
-process.on('unhandledRejection', (err) => {
-  logger.error(`Unhandled Rejection: ${err.message}`);
-  server.close(() => process.exit(1));
-});
+if (require.main === module) {
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    logger.info(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+  });
+
+  process.on('unhandledRejection', (err) => {
+    logger.error(`Unhandled Rejection: ${err.message}`);
+    server.close(() => process.exit(1));
+  });
+}
 
 module.exports = app;

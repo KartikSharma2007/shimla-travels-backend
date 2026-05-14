@@ -14,18 +14,18 @@ let mongod;
 
 // ── Set test environment variables BEFORE app is imported ────────────────────
 // These override your .env so tests never hit real Atlas / real Razorpay
-process.env.NODE_ENV       = 'test';
-process.env.JWT_SECRET     = 'test-jwt-secret-at-least-32-chars-long';
+process.env.NODE_ENV = 'test';
+process.env.JWT_SECRET = 'test-jwt-secret-at-least-32-chars-long';
 process.env.JWT_REFRESH_SECRET = 'test-refresh-secret-at-least-32-chars';
-process.env.JWT_EXPIRE     = '1h';
+process.env.JWT_EXPIRE = '1h';
 process.env.JWT_COOKIE_EXPIRE = '1';
-process.env.GOOGLE_CLIENT_ID   = 'test-google-client-id';
-process.env.RAZORPAY_KEY_ID    = 'rzp_test_mock_key';
+process.env.GOOGLE_CLIENT_ID = 'test-google-client-id';
+process.env.RAZORPAY_KEY_ID = 'rzp_test_mock_key';
 process.env.RAZORPAY_KEY_SECRET = 'mock_secret';
-process.env.EMAIL_USER     = 'test@test.com';
-process.env.EMAIL_PASS     = 'test-pass';
-process.env.EMAIL_FROM     = 'test@test.com';
-process.env.LOG_LEVEL      = 'silent';   // suppress Winston logs during tests
+process.env.EMAIL_USER = 'test@test.com';
+process.env.EMAIL_PASS = 'test-pass';
+process.env.EMAIL_FROM = 'test@test.com';
+process.env.LOG_LEVEL = 'silent';   // suppress Winston logs during tests
 
 // ── Start in-memory MongoDB before all tests ─────────────────────────────────
 beforeAll(async () => {

@@ -14,26 +14,26 @@
 //   7. Old password no longer works after reset
 //   8. New password works after reset
 
-const request  = require('supertest');
-const crypto   = require('crypto');
-const app      = require('../server');
+const request = require('supertest');
+const crypto = require('crypto');
+const app = require('../server');
 const { User } = require('../models');
 const { generateToken } = require('../middleware/auth');
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 const createVerifiedUser = async () => {
   return User.create({
-    fullName:            'Reset Test User',
-    age:                 30,
-    gender:              'male',
-    username:            `resetuser_${Date.now()}`,
-    email:               `reset_${Date.now()}@test.com`,
-    phone:               '9876543210',
-    password:            'OldPassword123!',
+    fullName: 'Reset Test User',
+    age: 30,
+    gender: 'male',
+    username: `resetuser_${Date.now()}`,
+    email: `reset_${Date.now()}@test.com`,
+    phone: '9876543210',
+    password: 'OldPassword123!',
     preferredTravelType: 'nature',
-    isEmailVerified:     true,
-    isActive:            true,
-    authProvider:        'local',
+    isEmailVerified: true,
+    isActive: true,
+    authProvider: 'local',
   });
 };
 
@@ -82,7 +82,7 @@ describe('POST /api/v1/auth/reset-password/:token', () => {
     const rawToken = crypto.randomBytes(32).toString('hex');
     const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
 
-    user.passwordResetToken   = hashedToken;
+    user.passwordResetToken = hashedToken;
     user.passwordResetExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
     await user.save({ validateBeforeSave: false });
 
@@ -141,7 +141,7 @@ describe('POST /api/v1/auth/reset-password/:token', () => {
     const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
 
     // Set token that expired 1 minute ago
-    user.passwordResetToken   = hashedToken;
+    user.passwordResetToken = hashedToken;
     user.passwordResetExpires = Date.now() - 60 * 1000;
     await user.save({ validateBeforeSave: false });
 

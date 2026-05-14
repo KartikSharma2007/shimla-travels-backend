@@ -11,26 +11,26 @@
 //   5. authorize() blocks users with wrong role     → 403 INSUFFICIENT_PERMISSIONS
 //   6. authorize() allows users with correct role   → passes through
 
-const jwt         = require('jsonwebtoken');
-const mongoose    = require('mongoose');
-const httpMocks   = require('node-mocks-http');  // npm i -D node-mocks-http
-const { User }    = require('../models');
+const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
+const httpMocks = require('node-mocks-http');  // npm i -D node-mocks-http
+const { User } = require('../models');
 const { protect, authorize, generateToken } = require('../middleware/auth');
 
 // ─── Helper: create a real user in the in-memory DB ──────────────────────────
 const createTestUser = async (overrides = {}) => {
   return User.create({
-    fullName:            'Test User',
-    age:                 25,
-    gender:              'male',
-    username:            `testuser_${Date.now()}`,
-    email:               `test_${Date.now()}@example.com`,
-    phone:               '9876543210',
-    password:            'Password123!',
+    fullName: 'Test User',
+    age: 25,
+    gender: 'male',
+    username: `testuser_${Date.now()}`,
+    email: `test_${Date.now()}@example.com`,
+    phone: '9876543210',
+    password: 'Password123!',
     preferredTravelType: 'adventure',
-    isEmailVerified:     true,
-    isActive:            true,
-    authProvider:        'local',
+    isEmailVerified: true,
+    isActive: true,
+    authProvider: 'local',
     ...overrides,
   });
 };
@@ -48,8 +48,8 @@ describe('protect() middleware', () => {
 
   // ── Test 1: No token at all ────────────────────────────────────────────────
   test('returns 401 NO_TOKEN when Authorization header is missing', async () => {
-    const req  = mockRequest();
-    const res  = mockResponse();
+    const req = mockRequest();
+    const res = mockResponse();
     const next = jest.fn();
 
     await protect(req, res, next);
@@ -63,8 +63,8 @@ describe('protect() middleware', () => {
 
   // ── Test 2: Malformed / invalid token ─────────────────────────────────────
   test('returns 401 INVALID_TOKEN when token is garbage', async () => {
-    const req  = mockRequest({ authorization: 'Bearer this.is.garbage' });
-    const res  = mockResponse();
+    const req = mockRequest({ authorization: 'Bearer this.is.garbage' });
+    const res = mockResponse();
     const next = jest.fn();
 
     await protect(req, res, next);
@@ -86,8 +86,8 @@ describe('protect() middleware', () => {
       { expiresIn: '-1s' }   // negative = already expired
     );
 
-    const req  = mockRequest({ authorization: `Bearer ${expiredToken}` });
-    const res  = mockResponse();
+    const req = mockRequest({ authorization: `Bearer ${expiredToken}` });
+    const res = mockResponse();
     const next = jest.fn();
 
     await protect(req, res, next);
@@ -101,11 +101,11 @@ describe('protect() middleware', () => {
 
   // ── Test 4: Valid token — user gets attached to req ───────────────────────
   test('calls next() and attaches user to req when token is valid', async () => {
-    const user  = await createTestUser();
+    const user = await createTestUser();
     const token = generateToken(user._id);
 
-    const req  = mockRequest({ authorization: `Bearer ${token}` });
-    const res  = mockResponse();
+    const req = mockRequest({ authorization: `Bearer ${token}` });
+    const res = mockResponse();
     const next = jest.fn();
 
     await protect(req, res, next);
@@ -120,10 +120,10 @@ describe('protect() middleware', () => {
   // ── Test 5: Token valid but user deleted from DB ──────────────────────────
   test('returns 401 USER_NOT_FOUND when user no longer exists in DB', async () => {
     const fakeId = new mongoose.Types.ObjectId();
-    const token  = generateToken(fakeId);
+    const token = generateToken(fakeId);
 
-    const req  = mockRequest({ authorization: `Bearer ${token}` });
-    const res  = mockResponse();
+    const req = mockRequest({ authorization: `Bearer ${token}` });
+    const res = mockResponse();
     const next = jest.fn();
 
     await protect(req, res, next);
@@ -136,11 +136,11 @@ describe('protect() middleware', () => {
 
   // ── Test 6: Deactivated account ───────────────────────────────────────────
   test('returns 401 ACCOUNT_INACTIVE for deactivated users', async () => {
-    const user  = await createTestUser({ isActive: false });
+    const user = await createTestUser({ isActive: false });
     const token = generateToken(user._id);
 
-    const req  = mockRequest({ authorization: `Bearer ${token}` });
-    const res  = mockResponse();
+    const req = mockRequest({ authorization: `Bearer ${token}` });
+    const res = mockResponse();
     const next = jest.fn();
 
     await protect(req, res, next);
@@ -156,9 +156,9 @@ describe('authorize() middleware', () => {
 
   // ── Test 7: User role blocked from admin route ────────────────────────────
   test('returns 403 INSUFFICIENT_PERMISSIONS when user role is not in allowed list', async () => {
-    const req  = mockRequest();
-    req.user   = { role: 'user' };     // simulate protect() having run
-    const res  = mockResponse();
+    const req = mockRequest();
+    req.user = { role: 'user' };     // simulate protect() having run
+    const res = mockResponse();
     const next = jest.fn();
 
     // Only admins allowed
@@ -173,9 +173,9 @@ describe('authorize() middleware', () => {
 
   // ── Test 8: Admin passes ──────────────────────────────────────────────────
   test('calls next() when user role matches allowed list', async () => {
-    const req  = mockRequest();
-    req.user   = { role: 'admin' };
-    const res  = mockResponse();
+    const req = mockRequest();
+    req.user = { role: 'admin' };
+    const res = mockResponse();
     const next = jest.fn();
 
     const adminOnly = authorize('admin');
@@ -187,9 +187,9 @@ describe('authorize() middleware', () => {
 
   // ── Test 9: Multiple roles allowed ───────────────────────────────────────
   test('calls next() when role is one of multiple allowed roles', async () => {
-    const req  = mockRequest();
-    req.user   = { role: 'moderator' };
-    const res  = mockResponse();
+    const req = mockRequest();
+    req.user = { role: 'moderator' };
+    const res = mockResponse();
     const next = jest.fn();
 
     const multiRole = authorize('admin', 'moderator');
