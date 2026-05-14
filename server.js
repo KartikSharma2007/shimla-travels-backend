@@ -87,7 +87,13 @@ app.get('*', (req, res, next) => {
   if (req.originalUrl.startsWith('/api')) {
     return next();
   }
-  res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
+  // Only serve frontend if the dist folder actually exists
+  const indexPath = path.join(__dirname, '../frontend/dist/index.html');
+  if (require('fs').existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    next();
+  }
 });
 
 app.get('/', (req, res) => {
