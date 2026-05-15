@@ -48,3 +48,19 @@ router.put('/:id', idParamValidator, hotelController.updateHotel);
 router.delete('/:id', idParamValidator, hotelController.deleteHotel);
 
 module.exports = router;
+
+// ONE-TIME cleanup — removes duplicate image URLs from all hotels
+// Call once: GET /api/v1/hotels/cleanup-duplicates then remove this route
+router.get('/cleanup-duplicates', async (req, res) => {
+  const Hotel = require('../models/Hotel');
+  const hotels = await Hotel.find({}).lean();
+  let fixed = 0;
+  for (const h of hotels) {
+    const unique = [...new Set((h.images || []).filter(u => u && u.startsWith('http')))];
+    if (unique.length !== (h.images || []).length) {
+      await Hotel.findByIdAndUpdate(h._id, { $set: { images: unique } });
+      fixed++;
+    }
+  }
+  res.json({ success: true, message: `Cleaned ${fixed} hotels` });
+});

@@ -79,7 +79,7 @@ const makeStorage = (folder, transformations = []) => {
       const publicId = `shimla-travels/${folder}/${timestamp}-${random}`;
 
       return {
-        folder: `shimla-travels/${folder}`,
+        // Don't set folder separately — public_id already contains the full path
         public_id: publicId,
         allowed_formats: ALLOWED_FORMATS,
         transformation: transformations.length > 0 ? transformations : undefined,
