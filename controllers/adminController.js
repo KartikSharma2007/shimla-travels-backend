@@ -600,7 +600,7 @@ const updateHotelPrice = asyncHandler(async (req, res) => {
 
   const hotel = await Hotel.findByIdAndUpdate(
     req.params.id,
-    { 'pricing.basePrice': Number(basePrice) },
+    { basePrice: Number(basePrice) },
     { new: true }
   );
   if (!hotel) throw new AppError('Hotel not found', 404, 'NOT_FOUND');
