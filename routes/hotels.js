@@ -36,6 +36,7 @@ router.get('/deactivated-ids', async (req, res) => {
   }
 });
 
+router.get('/by-static/:staticId', hotelController.getHotelByStaticId); // Cloudinary images by staticId
 router.get('/:id', idParamValidator, hotelController.getHotel);
 
 // Protected admin routes

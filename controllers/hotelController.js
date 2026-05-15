@@ -264,6 +264,7 @@ const deleteHotel = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
+  getHotelByStaticId,
   getHotels,
   getHotel,
   getFeaturedHotels,
@@ -272,3 +273,28 @@ module.exports = {
   updateHotel,
   deleteHotel,
 };
+
+// @desc    Get hotel images by staticId (public — used by HotelDetailPage)
+// @route   GET /api/v1/hotels/by-static/:staticId
+// @access  Public
+const getHotelByStaticId = asyncHandler(async (req, res) => {
+  const staticId = parseInt(req.params.staticId);
+  const hotel = await Hotel.findOne({ staticId }).lean();
+
+  if (!hotel) {
+    return res.json({ success: false, data: { images: [] } });
+  }
+
+  const images = (hotel.images || [])
+    .map(img => (typeof img === 'string' ? img : img?.url))
+    .filter(Boolean);
+
+  res.json({
+    success: true,
+    data: {
+      images,
+      basePrice: hotel.basePrice,
+      _id: hotel._id,
+    },
+  });
+});
