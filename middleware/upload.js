@@ -27,9 +27,9 @@ const logger = require('../utils/logger');
 // ── Configure Cloudinary ──────────────────────────────────────────────────────
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key:    process.env.CLOUDINARY_API_KEY,
+  api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
-  secure:     true,   // always use https URLs
+  secure: true,   // always use https URLs
 });
 
 // Check if Cloudinary is configured (not needed during tests)
@@ -41,15 +41,15 @@ const cloudinaryConfigured =
 
 // ── Allowed file types ────────────────────────────────────────────────────────
 const ALLOWED_FORMATS = ['jpg', 'jpeg', 'png', 'webp', 'avif'];
-const MAX_FILE_SIZE   = 5 * 1024 * 1024;   // 5MB per file
-const MAX_FILES       = 10;                  // max files in a multi-upload
+const MAX_FILE_SIZE = 5 * 1024 * 1024;   // 5MB per file
+const MAX_FILES = 10;                  // max files in a multi-upload
 
 // ── File filter: only images allowed ─────────────────────────────────────────
 const imageFileFilter = (req, file, cb) => {
+  // Check extension only — mimetype is unreliable for avif/webp on some browsers
   const ext = path.extname(file.originalname).toLowerCase().replace('.', '');
-  const mime = file.mimetype.startsWith('image/');
 
-  if (!mime || !ALLOWED_FORMATS.includes(ext)) {
+  if (!ALLOWED_FORMATS.includes(ext)) {
     return cb(
       new Error(`Only image files are allowed (${ALLOWED_FORMATS.join(', ')})`),
       false
@@ -75,12 +75,12 @@ const makeStorage = (folder, transformations = []) => {
     params: async (req, file) => {
       // Build a unique public_id:  shimla-travels/hotels/1748123456789-random
       const timestamp = Date.now();
-      const random    = Math.random().toString(36).substring(2, 8);
-      const publicId  = `shimla-travels/${folder}/${timestamp}-${random}`;
+      const random = Math.random().toString(36).substring(2, 8);
+      const publicId = `shimla-travels/${folder}/${timestamp}-${random}`;
 
       return {
-        folder:         `shimla-travels/${folder}`,
-        public_id:      publicId,
+        folder: `shimla-travels/${folder}`,
+        public_id: publicId,
         allowed_formats: ALLOWED_FORMATS,
         transformation: transformations.length > 0 ? transformations : undefined,
         // quality: auto — Cloudinary picks the best quality/size balance
@@ -124,13 +124,13 @@ const createUploader = (storage) =>
     fileFilter: imageFileFilter,
     limits: {
       fileSize: MAX_FILE_SIZE,
-      files:    MAX_FILES,
+      files: MAX_FILES,
     },
   });
 
-const hotelUploader      = createUploader(hotelStorage);
-const packageUploader    = createUploader(packageStorage);
-const avatarUploader     = createUploader(avatarStorage);
+const hotelUploader = createUploader(hotelStorage);
+const packageUploader = createUploader(packageStorage);
+const avatarUploader = createUploader(avatarStorage);
 const attractionUploader = createUploader(attractionStorage);
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -144,9 +144,9 @@ const attractionUploader = createUploader(attractionStorage);
  */
 const uploadSingle = (fieldName, type = 'hotel') => {
   const uploader = {
-    hotel:      hotelUploader,
-    package:    packageUploader,
-    avatar:     avatarUploader,
+    hotel: hotelUploader,
+    package: packageUploader,
+    avatar: avatarUploader,
     attraction: attractionUploader,
   }[type] || hotelUploader;
 
@@ -166,9 +166,9 @@ const uploadSingle = (fieldName, type = 'hotel') => {
  */
 const uploadMultiple = (fieldName, maxCount = 5, type = 'hotel') => {
   const uploader = {
-    hotel:      hotelUploader,
-    package:    packageUploader,
-    avatar:     avatarUploader,
+    hotel: hotelUploader,
+    package: packageUploader,
+    avatar: avatarUploader,
     attraction: attractionUploader,
   }[type] || hotelUploader;
 
@@ -187,9 +187,9 @@ const uploadMultiple = (fieldName, maxCount = 5, type = 'hotel') => {
  */
 const uploadFields = (fields, type = 'hotel') => {
   const uploader = {
-    hotel:      hotelUploader,
-    package:    packageUploader,
-    avatar:     avatarUploader,
+    hotel: hotelUploader,
+    package: packageUploader,
+    avatar: avatarUploader,
     attraction: attractionUploader,
   }[type] || hotelUploader;
 
@@ -212,21 +212,21 @@ const handleUploadError = (err, res) => {
       return res.status(400).json({
         success: false,
         message: `File too large. Maximum size is ${MAX_FILE_SIZE / 1024 / 1024}MB`,
-        error:   'FILE_TOO_LARGE',
+        error: 'FILE_TOO_LARGE',
       });
     }
     if (err.code === 'LIMIT_FILE_COUNT') {
       return res.status(400).json({
         success: false,
         message: `Too many files. Maximum is ${MAX_FILES} files`,
-        error:   'TOO_MANY_FILES',
+        error: 'TOO_MANY_FILES',
       });
     }
     if (err.code === 'LIMIT_UNEXPECTED_FILE') {
       return res.status(400).json({
         success: false,
         message: 'Unexpected field name in upload',
-        error:   'UNEXPECTED_FIELD',
+        error: 'UNEXPECTED_FIELD',
       });
     }
   }
@@ -234,7 +234,7 @@ const handleUploadError = (err, res) => {
   return res.status(400).json({
     success: false,
     message: err.message || 'File upload failed',
-    error:   'UPLOAD_ERROR',
+    error: 'UPLOAD_ERROR',
   });
 };
 
@@ -260,10 +260,10 @@ const deleteImage = async (publicIdOrUrl) => {
     if (publicIdOrUrl.includes('cloudinary.com')) {
       // URL format: .../shimla-travels/hotels/1748123456789-abc123.jpg
       // Extract: shimla-travels/hotels/1748123456789-abc123
-      const parts   = publicIdOrUrl.split('/');
+      const parts = publicIdOrUrl.split('/');
       const filename = parts[parts.length - 1].replace(/\.[^.]+$/, ''); // remove extension
-      const folder   = parts.slice(parts.indexOf('shimla-travels')).slice(0, -1).join('/');
-      publicId       = `${folder}/${filename}`;
+      const folder = parts.slice(parts.indexOf('shimla-travels')).slice(0, -1).join('/');
+      publicId = `${folder}/${filename}`;
     }
 
     const result = await cloudinary.uploader.destroy(publicId);
@@ -293,8 +293,8 @@ const deleteImages = async (publicIdsOrUrls) => {
  */
 const getOptimizedUrl = (publicId, options = {}) => {
   return cloudinary.url(publicId, {
-    secure:       true,
-    quality:      'auto',
+    secure: true,
+    quality: 'auto',
     fetch_format: 'auto',
     ...options,
   });
