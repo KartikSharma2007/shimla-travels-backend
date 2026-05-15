@@ -80,6 +80,15 @@ app.use(morgan('combined', { stream: logger.stream }));
 app.use('/api', apiLimiter);
 app.use('/api', routes);
 
+// Health / utility routes — must be BEFORE the wildcard catch-all
+app.get('/', (req, res) => {
+  res.json({ success: true, message: 'Shimla Travels API', version: '1.0.0' });
+});
+
+app.get('/ping', (req, res) => {
+  res.json({ ok: true, ts: Date.now() });
+});
+
 // Serve React frontend
 app.use(express.static(path.join(__dirname, '../frontend/dist')));
 
@@ -94,14 +103,6 @@ app.get('*', (req, res, next) => {
   } else {
     next();
   }
-});
-
-app.get('/', (req, res) => {
-  res.json({ success: true, message: 'Shimla Travels API', version: '1.0.0' });
-});
-
-app.get('/ping', (req, res) => {
-  res.json({ ok: true, ts: Date.now() });
 });
 
 app.use(notFound);
