@@ -37,22 +37,29 @@ const uploadHotelImages = asyncHandler(async (req, res) => {
 
   // If a hotelId was provided, update the hotel document immediately
   if (req.body.hotelId) {
+    logger.info(`Saving images to hotel ${req.body.hotelId}: ${JSON.stringify(urls)}`);
     const hotel = await Hotel.findById(req.body.hotelId);
     if (!hotel) throw new AppError('Hotel not found', 404, 'HOTEL_NOT_FOUND');
 
-    // First image becomes the cover if hotel has no cover yet
-    if (!hotel.coverImage) hotel.coverImage = urls[0];
-
-    hotel.images.push(...urls);
-    await hotel.save({ validateBeforeSave: false });
+    // Use findByIdAndUpdate to avoid any schema validation issues
+    await Hotel.findByIdAndUpdate(
+      req.body.hotelId,
+      {
+        $push: { images: { $each: urls } },
+        $set: hotel.coverImage ? {} : { coverImage: urls[0] },
+      },
+      { new: true }
+    );
+    const updated = await Hotel.findById(req.body.hotelId).lean();
+    logger.info(`Hotel ${req.body.hotelId} now has ${updated.images.length} images`);
 
     return res.status(200).json({
       success: true,
       message: `${urls.length} image(s) uploaded and saved to hotel`,
       data: {
         urls,
-        coverImage: hotel.coverImage,
-        totalImages: hotel.images.length,
+        coverImage: updated.coverImage,
+        totalImages: updated.images.length,
       },
     });
   }
