@@ -306,24 +306,33 @@ const getOptimizedUrl = (publicId, options = {}) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
+ * Extract Cloudinary URL from a multer file object.
+ * multer-storage-cloudinary v4 + cloudinary v1 stores URL in:
+ *   f.path OR f.secure_url OR f.url
+ */
+const getFileUrl = (f) => f.secure_url || f.path || f.url || null;
+
+/**
  * Get the secure URL from req.file (single upload)
- * Returns null if no file was uploaded
  */
 const getUploadedUrl = (req) => {
-  return req.file?.path || null;
+  if (!req.file) return null;
+  return getFileUrl(req.file);
 };
 
 /**
  * Get array of secure URLs from req.files (multiple upload)
- * Returns empty array if no files
  */
 const getUploadedUrls = (req) => {
   if (!req.files) return [];
-  if (Array.isArray(req.files)) return req.files.map(f => f.path);
+  if (Array.isArray(req.files)) return req.files.map(getFileUrl).filter(Boolean);
   // req.files is an object when using .fields()
   const urls = [];
   for (const field in req.files) {
-    req.files[field].forEach(f => urls.push(f.path));
+    req.files[field].forEach(f => {
+      const url = getFileUrl(f);
+      if (url) urls.push(url);
+    });
   }
   return urls;
 };

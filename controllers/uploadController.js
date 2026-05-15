@@ -41,10 +41,15 @@ const uploadHotelImages = asyncHandler(async (req, res) => {
     const hotel = await Hotel.findById(req.body.hotelId);
     if (!hotel) throw new AppError('Hotel not found', 404, 'HOTEL_NOT_FOUND');
 
-    // Use findByIdAndUpdate to avoid any schema validation issues
-    const updateQuery = { $push: { images: { $each: urls } } };
-    if (!hotel.coverImage) updateQuery.$set = { coverImage: urls[0] };
-    await Hotel.findByIdAndUpdate(req.body.hotelId, updateQuery, { new: true });
+    // Pull out any nulls first, then push new URLs
+    const updateQuery = {
+      $pull: { images: null },   // clean up any nulls from before the fix
+    };
+    await Hotel.findByIdAndUpdate(req.body.hotelId, updateQuery);
+
+    const pushQuery = { $push: { images: { $each: urls } } };
+    if (!hotel.coverImage) pushQuery.$set = { coverImage: urls[0] };
+    await Hotel.findByIdAndUpdate(req.body.hotelId, pushQuery, { new: true });
     const updated = await Hotel.findById(req.body.hotelId).lean();
     logger.info(`Hotel ${req.body.hotelId} now has ${updated.images.length} images`);
 

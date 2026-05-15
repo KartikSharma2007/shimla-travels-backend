@@ -263,6 +263,17 @@ const deleteHotel = asyncHandler(async (req, res) => {
   });
 });
 
+module.exports = {
+  getHotelByStaticId,
+  getHotels,
+  getHotel,
+  getFeaturedHotels,
+  searchHotels,
+  createHotel,
+  updateHotel,
+  deleteHotel,
+};
+
 // @desc    Get hotel images by staticId (public — used by HotelDetailPage)
 // @route   GET /api/v1/hotels/by-static/:staticId
 // @access  Public
@@ -274,9 +285,10 @@ const getHotelByStaticId = asyncHandler(async (req, res) => {
     return res.json({ success: false, data: { images: [] } });
   }
 
+  // Filter out any null/empty values that got pushed before the URL fix
   const images = (hotel.images || [])
     .map(img => (typeof img === 'string' ? img : img?.url))
-    .filter(Boolean);
+    .filter(url => url && url.startsWith('http'));
 
   res.json({
     success: true,
@@ -287,14 +299,3 @@ const getHotelByStaticId = asyncHandler(async (req, res) => {
     },
   });
 });
-
-module.exports = {
-  getHotelByStaticId,
-  getHotels,
-  getHotel,
-  getFeaturedHotels,
-  searchHotels,
-  createHotel,
-  updateHotel,
-  deleteHotel,
-};
