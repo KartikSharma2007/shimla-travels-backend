@@ -70,6 +70,7 @@ const getHotels = asyncHandler(async (req, res) => {
     data: {
       hotels: hotels.map(hotel => ({
         id: hotel._id,
+        staticId: hotel.staticId,
         name: hotel.name,
         description: hotel.shortDescription || hotel.description.substring(0, 200),
         location: hotel.location,
@@ -262,7 +263,6 @@ const deleteHotel = asyncHandler(async (req, res) => {
     message: 'Hotel deactivated successfully',
   });
 });
-
 
 
 // @desc    Get hotel images by staticId (public — used by HotelDetailPage)
