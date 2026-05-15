@@ -32,6 +32,13 @@ cloudinary.config({
   secure:     true,   // always use https URLs
 });
 
+// Check if Cloudinary is configured (not needed during tests)
+const cloudinaryConfigured =
+  !!process.env.CLOUDINARY_CLOUD_NAME &&
+  process.env.CLOUDINARY_CLOUD_NAME !== 'your_cloud_name' &&
+  !!process.env.CLOUDINARY_API_KEY &&
+  !!process.env.CLOUDINARY_API_SECRET;
+
 // ── Allowed file types ────────────────────────────────────────────────────────
 const ALLOWED_FORMATS = ['jpg', 'jpeg', 'png', 'webp', 'avif'];
 const MAX_FILE_SIZE   = 5 * 1024 * 1024;   // 5MB per file
@@ -55,8 +62,14 @@ const imageFileFilter = (req, file, cb) => {
 //  Storage factory
 //  Creates a Cloudinary storage config for a specific folder and transformations.
 //  Each upload type (hotel, package, avatar) gets its own folder + transforms.
+//  Falls back to memory storage during tests (when Cloudinary isn't configured).
 // ─────────────────────────────────────────────────────────────────────────────
 const makeStorage = (folder, transformations = []) => {
+  // Use memory storage during tests — no real uploads needed
+  if (!cloudinaryConfigured) {
+    return multer.memoryStorage();
+  }
+
   return new CloudinaryStorage({
     cloudinary,
     params: async (req, file) => {
@@ -235,6 +248,12 @@ const handleUploadError = (err, res) => {
  * @param {string} publicIdOrUrl - either the public_id or the full Cloudinary URL
  */
 const deleteImage = async (publicIdOrUrl) => {
+  // No-op in test environment or when Cloudinary isn't configured
+  if (!cloudinaryConfigured) {
+    logger.debug(`Cloudinary not configured — skipping delete for: ${publicIdOrUrl}`);
+    return { result: 'ok' };
+  }
+
   try {
     // Extract public_id from URL if a full URL was passed
     let publicId = publicIdOrUrl;

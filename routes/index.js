@@ -12,6 +12,7 @@ const paymentRoutes = require('./payments');
 const siteReviewRoutes = require('./siteReviews');
 const adminRoutes = require('./admin');        // ✅ NEW
 const searchRoutes = require('./search');
+const uploadRoutes = require('./upload');      // ✅ Cloudinary image uploads
 
 router.use('/v1/auth', authRoutes);
 router.use('/v1/bookings', bookingRoutes);
@@ -24,6 +25,7 @@ router.use('/v1/payments', paymentRoutes);
 router.use('/v1/site-reviews', siteReviewRoutes);
 router.use('/v1/admin', adminRoutes);
 router.use('/v1/search', searchRoutes);        // ✅ NEW
+router.use('/v1/upload', uploadRoutes);        // ✅ Cloudinary image uploads
 
 router.get('/v1/health', (req, res) => {
   res.json({
