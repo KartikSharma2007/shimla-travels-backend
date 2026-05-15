@@ -18,8 +18,7 @@ router.get('/', paginationValidator, hotelController.getHotels);
 router.get('/featured', hotelController.getFeaturedHotels);
 router.get('/search', hotelController.searchHotels);
 
-// ✅ Returns staticIds of deactivated hotels so frontend can filter static data
-// Public — no auth needed, no sensitive info
+// Returns staticIds of deactivated hotels so frontend can filter static data
 router.get('/deactivated-ids', async (req, res) => {
   try {
     const Hotel = require('../models/Hotel');
@@ -36,21 +35,10 @@ router.get('/deactivated-ids', async (req, res) => {
   }
 });
 
-router.get('/by-static/:staticId', hotelController.getHotelByStaticId); // Cloudinary images by staticId
-router.get('/:id', idParamValidator, hotelController.getHotel);
-
-// Protected admin routes
-router.use(protect);
-router.use(authorize('admin'));
-
-router.post('/', hotelController.createHotel);
-router.put('/:id', idParamValidator, hotelController.updateHotel);
-router.delete('/:id', idParamValidator, hotelController.deleteHotel);
-
-module.exports = router;
+router.get('/by-static/:staticId', hotelController.getHotelByStaticId);
 
 // ONE-TIME cleanup — removes duplicate image URLs from all hotels
-// Call once: GET /api/v1/hotels/cleanup-duplicates then remove this route
+// After running once, delete this route
 router.get('/cleanup-duplicates', async (req, res) => {
   const Hotel = require('../models/Hotel');
   const hotels = await Hotel.find({}).lean();
@@ -64,3 +52,16 @@ router.get('/cleanup-duplicates', async (req, res) => {
   }
   res.json({ success: true, message: `Cleaned ${fixed} hotels` });
 });
+
+// MUST be after all named routes — catches /:id last
+router.get('/:id', idParamValidator, hotelController.getHotel);
+
+// Protected admin routes
+router.use(protect);
+router.use(authorize('admin'));
+
+router.post('/', hotelController.createHotel);
+router.put('/:id', idParamValidator, hotelController.updateHotel);
+router.delete('/:id', idParamValidator, hotelController.deleteHotel);
+
+module.exports = router;
