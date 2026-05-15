@@ -263,17 +263,6 @@ const deleteHotel = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = {
-  getHotelByStaticId,
-  getHotels,
-  getHotel,
-  getFeaturedHotels,
-  searchHotels,
-  createHotel,
-  updateHotel,
-  deleteHotel,
-};
-
 // @desc    Get hotel images by staticId (public — used by HotelDetailPage)
 // @route   GET /api/v1/hotels/by-static/:staticId
 // @access  Public
@@ -298,3 +287,14 @@ const getHotelByStaticId = asyncHandler(async (req, res) => {
     },
   });
 });
+
+module.exports = {
+  getHotelByStaticId,
+  getHotels,
+  getHotel,
+  getFeaturedHotels,
+  searchHotels,
+  createHotel,
+  updateHotel,
+  deleteHotel,
+};
