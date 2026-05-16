@@ -69,29 +69,29 @@ const getHotels = asyncHandler(async (req, res) => {
     success: true,
     data: {
       hotels: hotels.map(hotel => ({
-        id:           hotel._id,
-        _id:          hotel._id,
-        staticId:     hotel.staticId,
-        name:         hotel.name,
-        description:  hotel.description,
+        id: hotel._id,
+        _id: hotel._id,
+        staticId: hotel.staticId,
+        name: hotel.name,
+        description: hotel.description,
         shortDescription: hotel.shortDescription || hotel.description?.substring(0, 200),
-        location:     hotel.location,
-        images:       hotel.images,
-        coverImage:   hotel.coverImage,
-        basePrice:    hotel.basePrice,
-        price:        hotel.basePrice,
+        location: hotel.location,
+        images: hotel.images,
+        coverImage: hotel.coverImage,
+        basePrice: hotel.basePrice,
+        price: hotel.basePrice,
         averagePrice: hotel.averagePrice,
-        rating:       hotel.rating,
+        rating: hotel.rating,
         totalReviews: hotel.totalReviews,
-        amenities:    hotel.amenities,
-        starRating:   hotel.starRating,
-        isFeatured:   hotel.isFeatured,
-        isActive:     hotel.isActive,
-        checkInTime:  hotel.checkInTime,
+        amenities: hotel.amenities,
+        starRating: hotel.starRating,
+        isFeatured: hotel.isFeatured,
+        isActive: hotel.isActive,
+        checkInTime: hotel.checkInTime,
         checkOutTime: hotel.checkOutTime,
-        policies:     hotel.policies,
-        nearby:       hotel.nearby,
-        roomTypes:    hotel.roomTypes.map(room => ({
+        policies: hotel.policies,
+        nearby: hotel.nearby,
+        roomTypes: hotel.roomTypes.map(room => ({
           type: room.type, price: room.price,
           features: room.features, maxGuests: room.maxGuests,
         })),
@@ -272,16 +272,6 @@ const deleteHotel = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = {
-  getHotelByStaticId,
-  getHotels,
-  getHotel,
-  getFeaturedHotels,
-  searchHotels,
-  createHotel,
-  updateHotel,
-  deleteHotel,
-};
 
 // @desc    Get hotel images by staticId (public — used by HotelDetailPage)
 // @route   GET /api/v1/hotels/by-static/:staticId
@@ -308,3 +298,14 @@ const getHotelByStaticId = asyncHandler(async (req, res) => {
     },
   });
 });
+
+module.exports = {
+  getHotelByStaticId,
+  getHotels,
+  getHotel,
+  getFeaturedHotels,
+  searchHotels,
+  createHotel,
+  updateHotel,
+  deleteHotel,
+};
